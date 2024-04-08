@@ -18,8 +18,7 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 file_str_ending = 'male_players.csv'
 datasets = {}
-df_name = ''
-url = f'https://raw.githubusercontent.com/karthikiyer365/Football-Scout/Visualizations/'
+url = 'https://raw.githubusercontent.com/karthikiyer365/Football-Scout/Visualizations/'
 
 
 for i in range(15,23):
