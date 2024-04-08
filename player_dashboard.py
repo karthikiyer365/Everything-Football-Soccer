@@ -23,12 +23,18 @@ url = 'https://raw.githubusercontent.com/karthikiyer365/Football-Scout/Visualiza
 
 for i in range(15,23):
     df_name = f'{url}FIFA{i}_{file_str_ending}'
-    print(df_name)
-    df = pd.read_csv(df_name)
-    print(df.head(5))
+    # print(df_name)
+    try:
+        df = pd.read_csv(df_name)
+    except:
+        print(f'FIFA{i}_{file_str_ending}:  data cant load')
+    # print(df.head(5))
 
 
 for i in range(16,23):
     df_name = f'{url}FIFA{i}_fe{file_str_ending}'
-    df = pd.read_csv(df_name)
-    print(df.head(5))
+    try:
+        df = pd.read_csv(df_name)
+    except:
+        print(f'FIFA{i}_fe{file_str_ending}:  data cant load')
+    # print(df.head(5))
