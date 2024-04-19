@@ -39,15 +39,15 @@ def fetch_clean_df(gender, year):
         # Dropping NaN values columns, unecessary columns etc.
         df.drop(['nation_logo_url', 'club_flag_url', 'club_logo_url', 'goalkeeping_speed',
                  'release_clause_eur', 'mentality_composure', 'player_traits', 'player_tags',
-                 'release_clause_eur', 'nation_jersey_number', 'nation_position', 'nation_team_id',
+                 'nation_jersey_number', 'nation_position', 'nation_team_id', 'club_position',
                  'club_contract_valid_until', 'club_joined', 'club_loaned_from', 'club_jersey_number',
                  'ls', 'st', 'rs', 'lw', 'lf', 'cf', 'rf', 'rw', 'lam', 'cam', 'ram', 'lm', 'lcm', 'cm',
                  'rcm', 'rm', 'lwb', 'ldm', 'cdm', 'rdm', 'rwb', 'lb', 'lcb', 'cb', 'rcb', 'rb', 'gk',
-                 'player_face_url',
-                 'nation_flag_url'], inplace=True, axis=1)
+                 'player_face_url', 'real_face', 'player_url', 'work_rate', 'nation_flag_url'],
+                inplace=True, axis=1)
 
         # Adding Year column for identification
-        df['year'] = year
+        df['year'] = '01/01/' + '20' + str(year)
         df['sex'] = 'M'
         df['player_positions'] = df['player_positions'].str.split(', ')
         df = df.explode('player_positions')
@@ -59,14 +59,14 @@ def fetch_clean_df(gender, year):
         df = pd.read_csv(df_id)
         df.drop(['nation_logo_url', 'club_flag_url', 'club_logo_url', 'goalkeeping_speed',
                  'release_clause_eur', 'mentality_composure', 'player_traits', 'player_tags',
-                 'release_clause_eur', 'nation_jersey_number', 'nation_position', 'nation_team_id',
+                 'nation_jersey_number', 'nation_position', 'nation_team_id', 'club_position',
                  'club_contract_valid_until', 'club_joined', 'club_loaned_from', 'club_jersey_number',
                  'ls', 'st', 'rs', 'lw', 'lf', 'cf', 'rf', 'rw', 'lam', 'cam', 'ram', 'lm', 'lcm', 'cm',
                  'rcm', 'rm', 'lwb', 'ldm', 'cdm', 'rdm', 'rwb', 'lb', 'lcb', 'cb', 'rcb', 'rb', 'gk',
-                 'player_face_url',
-                 'nation_flag_url'], inplace=True, axis=1)
+                 'player_face_url', 'real_face', 'player_url', 'work_rate', 'nation_flag_url'],
+                inplace=True, axis=1)
 
-        df['year'] = year
+        df['year'] = '01/01/' + '20' + str(year)
         df['sex'] = 'F'
         df['player_positions'] = df['player_positions'].str.split(', ')
         df = df.explode('player_positions')
@@ -96,4 +96,17 @@ for i in range(16, 23):
 # %%
 AllPlayers = pd.concat(player_datasets, axis=0)
 AllPlayers.reset_index(inplace=True)
-print((AllPlayers['year'][0:3]))
+
+#%% Data Discovery
+print((AllPlayers['year'][0]))
+print((AllPlayers['year'][200000]))
+AllPlayers['year'] = pd.DatetimeIndex(AllPlayers['year']).year
+
+#%%
+print((AllPlayers['year'][0]))
+print((AllPlayers['year'][200000]))
+print(AllPlayers['international_reputation'].unique())
+
+#%%
+print(AllPlayers.columns)
+
