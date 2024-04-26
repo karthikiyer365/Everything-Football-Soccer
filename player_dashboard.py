@@ -123,6 +123,8 @@ print(df)
 df.info()
 # %%
 dfm, dff = form_data()
+dfm.to_csv('Male_Players.csv')
+dfm.to_csv('Female_Players.csv')
 
 # %%
 dfm.isna().sum()
