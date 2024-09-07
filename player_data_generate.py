@@ -1,32 +1,14 @@
 # %% """Standard dependancies"""
 import pandas as pd
-import plotly.graph_objects as go
-from scipy.stats import boxcox
-from scipy.stats import kstest
-from scipy.stats import shapiro
-from scipy.stats import normaltest
 from prettytable import PrettyTable
-import numpy as np
-import dash
-from dash import html, dcc
-from dash.dependencies import Input, Output, State
-import plotly.express as px
 
+# %% The files have been setup in Github. Url which will help access the data
 url = 'https://raw.githubusercontent.com/karthikiyer365/Football-Scout/Visualizations/'
-
-def ks_test(x):
-    mean = np.mean(x)
-    std = np.std(x)
-    dist = np.random.normal(mean, std, len(x))
-    stats, p = kstest(x, dist)
-    return stats, p
-
-
 def get_table(df):
     # Defining col_headers for all tables
     df = df
     headers = df.columns.tolist()
-    headers.insert(0, " Normality tests:")
+    headers.insert(0, " Data Descriptions")
 
     # Creating table for passed Dataframe
     x = PrettyTable(headers)
@@ -35,20 +17,7 @@ def get_table(df):
         item.insert(0, index)
         x.add_row(item)
 
-    maxims = df.max().tolist()
-    row_normality = []
-    for item in maxims:
-        if item > 0.05:
-            row_normality.append('Might be Normal')
-        else:
-            row_normality.append('Not Normal')
-    row_normality.insert(0, 'Normality Result')
-    x.add_row(row_normality)
     return x
-
-
-# %% Data Fetch Functions
-
 
 def fetch_clean_df(gender, year):
     # For Male Datasets
@@ -59,7 +28,7 @@ def fetch_clean_df(gender, year):
         # Dropping NaN values columns, unecessary columns etc.
         df = df[['short_name', 'player_positions', 'overall', 'potential', 'value_eur', 'age', 'club_name',
                  'league_level', 'nationality_name', 'preferred_foot', 'pace', 'shooting', 'passing', 'dribbling',
-                 'defending',
+                 'defending', 'player_face_url',
                  'physic', 'goalkeeping_diving', 'goalkeeping_handling', 'goalkeeping_kicking',
                  'goalkeeping_positioning',
                  'goalkeeping_reflexes']]
@@ -76,7 +45,7 @@ def fetch_clean_df(gender, year):
         df = pd.read_csv(df_id)
         df = df[['short_name', 'player_positions', 'overall', 'potential', 'value_eur', 'age', 'club_name',
                  'league_level', 'nationality_name', 'preferred_foot', 'pace', 'shooting', 'passing', 'dribbling',
-                 'defending',
+                 'defending', 'player_face_url',
                  'physic', 'goalkeeping_diving', 'goalkeeping_handling', 'goalkeeping_kicking',
                  'goalkeeping_positioning',
                  'goalkeeping_reflexes']]
@@ -113,30 +82,44 @@ def form_data():
 
     return male_players, female_players
 
+
+# %% Taking a look at the data
+pd.set_option('display.max_rows', 500)
+pd.set_option('display.max_columns', 20)
+pd.set_option('display.width', 200)
+df = pd.read_csv(url + 'FIFA15_male_players.csv')
+get_table(df.head())
+
 # %%
 df = pd.read_csv('FIFA16_male_players.csv')
 
 # %%
-print(df)
+print(df.info())
+print(get_table(df.head()))
+df = df[['short_name', 'player_positions', 'overall', 'potential', 'value_eur', 'age', 'club_name',
+         'league_level', 'nationality_name', 'preferred_foot', 'pace', 'shooting', 'passing', 'dribbling',
+         'defending', 'player_face_url', 'physic', 'goalkeeping_diving', 'goalkeeping_handling',
+         'goalkeeping_kicking', 'goalkeeping_positioning', 'goalkeeping_reflexes']]
+df['year'] = '01/01/' + '20' + str(15)
+df['year'] = pd.DatetimeIndex(df['year']).year
+df['sex'] = 'F'
+df['player_positions'] = df['player_positions'].str.split(', ')
+df = df.explode('player_positions')
+df.reset_index(inplace=True, drop=True)
+
+print('\n\n',get_table(df.head()))
+# %%
+print(df.isna().sum())
+df.dropna(subset=['club_name', 'league_level'], inplace=True)
+df[['value_eur']] = df[['value_eur']].fillna(df[['value_eur']].mean())
+print(df.isna().sum())
 
 # %%
-df.info()
-# %%
-dfm, dff = form_data()
-dfm.to_csv('Male_Players.csv')
-dfm.to_csv('Female_Players.csv')
+df_male, df_female = form_data()
+
+print(get_table(df_male.sample(10)))
+print(get_table(df_female.sample(10)))
 
 # %%
-dfm.isna().sum()
-
-# %%
-len(dfm)
-# %%
-AllPlayers_male = pd.read_csv('Male_Players.csv')
-AllPlayers_female = pd.read_csv('Female_Players.csv')
-positions = AllPlayers_male['player_positions'].unique()
-# %%
-AllPlayers_male.head()
-
-# %%
-AllPlayers_female.head()
+df_male.to_csv('Male_Players.csv')
+df_female.to_csv('Female_Players.csv')
