@@ -25,3 +25,32 @@ def test_fetch_transfermarkt_values_filters_by_competition(monkeypatch):
     assert m.rows == 2  # only GB1 rows
     assert m.params == {"competition": "GB1"}
     assert set(pd.read_parquet(m.path)["player_id"]) == {1, 3}
+
+
+def test_fetch_transfermarkt_players_filters_and_trims(monkeypatch):
+    import soccerhub.readers.transfermarkt as tm
+
+    fake = pd.DataFrame(
+        {
+            "player_id": [10, 20],
+            "name": ["Bukayo Saka", "Vinicius Junior"],
+            "date_of_birth": ["2001-09-05", "2000-07-12"],
+            "country_of_citizenship": ["England", "Brazil"],
+            "position": ["Attack", "Attack"],
+            "sub_position": ["Right Winger", "Left Winger"],
+            "current_club_id": [11, 418],
+            "current_club_name": ["Arsenal FC", "Real Madrid"],
+            "current_club_domestic_competition_id": ["GB1", "ES1"],
+            "market_value_in_eur": [120000000, 180000000],
+            "agent_name": ["x", "y"],  # extra col must be dropped
+        }
+    )
+    monkeypatch.setattr(tm.pd, "read_csv", lambda url: fake)
+
+    m = tm.fetch_transfermarkt_players("GB1")
+    assert m.source == "transfermarkt"
+    assert m.dataset == "players"
+    assert m.rows == 1
+    df = pd.read_parquet(m.path)
+    assert list(df["name"]) == ["Bukayo Saka"]
+    assert "agent_name" not in df.columns
