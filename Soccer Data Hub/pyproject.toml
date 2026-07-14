@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "soccerhub"
+version = "0.1.0"
+description = "Unified fetch layer for open-source soccer data"
+requires-python = ">=3.10"
+dependencies = [
+    "soccerdata>=1.8",
+    "kloppy>=3.15",
+    "mcp>=1.2",
+    "pandas>=2.0",
+    "pyarrow>=14",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
