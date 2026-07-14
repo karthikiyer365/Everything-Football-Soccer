@@ -37,13 +37,24 @@ def fetch_transfermarkt_players(competition: str, force: bool = False) -> Manife
     )
 
 
-def fetch_transfermarkt_values(competition: str, force: bool = False) -> Manifest:
-    """Player market valuations filtered to one domestic competition."""
+def fetch_transfermarkt_values(competition: str | None, force: bool = False) -> Manifest:
+    """Player market valuations, optionally filtered to one domestic competition.
+
+    The competition filter uses the player's CURRENT club — fine for live
+    squads, wrong for historical seasons (transferred players vanish).
+    Pass None for the full valuation history of every player.
+    """
 
     def produce():
         df = pd.read_csv(TM_VALUATIONS_URL)
-        return df[df["player_club_domestic_competition_id"] == competition]
+        if competition is not None:
+            df = df[df["player_club_domestic_competition_id"] == competition]
+        return df
 
     return cached_fetch(
-        "transfermarkt", "valuations", {"competition": competition}, produce, force
+        "transfermarkt",
+        "valuations",
+        {"competition": competition or "ALL"},
+        produce,
+        force,
     )

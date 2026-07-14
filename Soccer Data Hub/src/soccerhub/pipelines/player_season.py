@@ -3,7 +3,7 @@ import pandas as pd
 
 from soccerhub.cache import cached_fetch
 from soccerhub.manifest import Manifest
-from soccerhub.pipelines.xref import LEAGUE_TO_TM, build_player_xref
+from soccerhub.pipelines.xref import build_player_xref
 from soccerhub.readers.fbref import fetch_fbref_season
 from soccerhub.readers.transfermarkt import fetch_transfermarkt_values
 
@@ -67,7 +67,9 @@ def build_player_season(league: str, season: str, force: bool = False) -> Manife
         ).drop(columns=["fbref_name"])
         merged["xref_method"] = merged["xref_method"].fillna("unmatched")
 
-        vals = pd.read_parquet(fetch_transfermarkt_values(LEAGUE_TO_TM[league]).path)
+        # None = all competitions: valuations are keyed by CURRENT club, so a
+        # league filter would drop every player who transferred out since
+        vals = pd.read_parquet(fetch_transfermarkt_values(None).path)
         vals = vals[vals["date"] <= season_end(season)]
         latest = (
             vals.sort_values("date")

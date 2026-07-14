@@ -27,6 +27,23 @@ def test_fetch_transfermarkt_values_filters_by_competition(monkeypatch):
     assert set(pd.read_parquet(m.path)["player_id"]) == {1, 3}
 
 
+def test_fetch_transfermarkt_values_unfiltered(monkeypatch):
+    import soccerhub.readers.transfermarkt as tm
+
+    fake = pd.DataFrame(
+        {
+            "player_id": [1, 2],
+            "market_value_in_eur": [100, 200],
+            "player_club_domestic_competition_id": ["GB1", "ES1"],
+        }
+    )
+    monkeypatch.setattr(tm.pd, "read_csv", lambda url: fake)
+
+    m = tm.fetch_transfermarkt_values(None)
+    assert m.rows == 2  # no competition filter
+    assert m.params == {"competition": "ALL"}
+
+
 def test_fetch_transfermarkt_players_filters_and_trims(monkeypatch):
     import soccerhub.readers.transfermarkt as tm
 

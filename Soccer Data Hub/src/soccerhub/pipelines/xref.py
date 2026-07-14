@@ -32,7 +32,9 @@ def normalize(name: str) -> str:
 
 
 def _load_mapping() -> pd.DataFrame:
-    return pd.read_csv(MAPPING_URL)
+    # upstream file is utf-8 with a few stray latin-1 bytes; strict utf-8
+    # raises, latin-1 mojibakes every accent -> utf-8 + replace stray bytes
+    return pd.read_csv(MAPPING_URL, encoding="utf-8", encoding_errors="replace")
 
 
 def _tm_id_from_url(url: str):
@@ -55,6 +57,10 @@ def build_player_xref(league: str, season: str, force: bool = False) -> Manifest
 
     def produce():
         fbref = pd.read_parquet(fetch_fbref_season(league, season).path).reset_index()
+        if isinstance(fbref.columns, pd.MultiIndex):
+            # real fbref frames have ('Performance','Gls')-style columns;
+            # we only need the index-derived flat ones (player/team/born)
+            fbref.columns = [c[0] for c in fbref.columns]
         players = fbref[["player", "team"]].drop_duplicates()
         born = (
             fbref.groupby("player")["born"].first()
