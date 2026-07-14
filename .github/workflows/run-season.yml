@@ -1,0 +1,39 @@
+name: run-season
+
+# ── cadence: edit this ONE line to change schedule ──
+# Mon + Thu 06:00 UTC
+on:
+  schedule:
+    - cron: "0 6 * * 1,4"
+  workflow_dispatch:
+    inputs:
+      league:
+        default: "ENG-Premier League"
+      season:
+        default: "2025"
+
+env:
+  LEAGUE: ${{ github.event.inputs.league || 'ENG-Premier League' }}
+  SEASON: ${{ github.event.inputs.season || '2025' }}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e "Soccer Data Hub"
+      - name: run pipeline (current season force-refetch)
+        working-directory: Soccer Data Hub
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python -c "
+          import os
+          from soccerhub import run_season
+          m = run_season(os.environ['LEAGUE'], os.environ['SEASON'], force=True)
+          print(m)
+          "

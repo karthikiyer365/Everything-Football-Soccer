@@ -8,6 +8,12 @@ from soccerhub.readers.transfermarkt import (
     fetch_transfermarkt_players,
     fetch_transfermarkt_values,
 )
+from soccerhub.pipelines import (
+    build_player_season,
+    build_player_xref,
+    push_to_supabase,
+    run_season,
+)
 
 __all__ = [
     "SoccerhubError",
@@ -16,4 +22,8 @@ __all__ = [
     "fetch_statsbomb_events",
     "fetch_transfermarkt_players",
     "fetch_transfermarkt_values",
+    "build_player_xref",
+    "build_player_season",
+    "push_to_supabase",
+    "run_season",
 ]
