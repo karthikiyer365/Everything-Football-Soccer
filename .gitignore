@@ -1,1 +1,63 @@
+# ── Data files (keep large/raw datasets out of git) ───────────────
+# Downloaded/scraped source data and generated outputs live locally, not in git.
+# Comment out a line if you deliberately want to version a small sample.
+*.csv
+*.parquet
+*.feather
+*.xlsx
+*.db
+*.sqlite
+*.sqlite3
+data/
+raw/
+datasets/
+
+# ── ML models & artifacts ─────────────────────────────────────────
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+*.onnx
+models/
+checkpoints/
+mlruns/
+
+# ── Notebooks ─────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Python ────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Virtual environments ──────────────────────────────────────────
+.venv/
+venv/
+env/
+.python-version
+
+# ── Secrets / config (API keys for data sources) ──────────────────
+.env
+.env.*
+*.key
+
+# ── Plots / exports (regenerated from code) ───────────────────────
+*.png
+*.jpg
+*.svg
+*.html
+figures/
+output/
+
+# ── Local working notes (not versioned) ───────────────────────────
+/SOCCER_DS_BACKLOG.md
+
+# ── IDE / OS ──────────────────────────────────────────────────────
 .idea/
+.vscode/
+.DS_Store
+Thumbs.db
