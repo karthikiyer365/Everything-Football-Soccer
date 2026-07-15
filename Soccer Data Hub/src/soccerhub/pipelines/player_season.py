@@ -89,7 +89,8 @@ def build_player_season(league: str, season: str, force: bool = False) -> Manife
         dups = merged.duplicated(key, keep=False)
         if dups.any():
             top = merged.loc[dups].groupby(key)["minutes"].transform("max")
-            minor = dups & (merged["minutes"] < top)
+            minor = pd.Series(False, index=merged.index)
+            minor.loc[dups] = merged.loc[dups, "minutes"] < top
             merged.loc[minor, ["tm_id", "market_value_in_eur", "value_date"]] = pd.NA
             merged.loc[minor, "xref_method"] = "ambiguous"
             merged.loc[minor, "xref_confidence"] = 0.0
