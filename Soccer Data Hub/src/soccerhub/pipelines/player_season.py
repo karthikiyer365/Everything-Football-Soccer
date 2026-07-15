@@ -123,9 +123,11 @@ def build_player_season(league: str, season: str, force: bool = False) -> Manife
             merged.loc[minor, ["tm_id", "market_value_in_eur", "value_date"]] = pd.NA
             merged.loc[minor, "xref_method"] = "ambiguous"
             merged.loc[minor, "xref_confidence"] = 0.0
+            by = merged.loc[dups, "birth_year"].map(
+                lambda v: str(int(v)) if pd.notna(v) else "?"  # NA propagates through +
+            )
             merged.loc[dups, "player_name"] = (
-                merged.loc[dups, "player_name"] + " ("
-                + merged.loc[dups, "birth_year"].astype("Int64").astype(str) + ")"
+                merged.loc[dups, "player_name"] + " (" + by + ")"
             )
             # ponytail: same name + team + birth year would still collide;
             # keep the bigger spell if that ever happens

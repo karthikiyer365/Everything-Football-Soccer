@@ -62,13 +62,19 @@ def test_same_name_same_team_disambiguated(monkeypatch):
         [("ESP-La Liga", "0910", "Barcelona", "Lionel Messi"),  # non-dup row:
          # disambiguation must align dup-only aggregates with the full frame
          ("ESP-La Liga", "0910", "Dep La Coruña", "Adrián López"),
-         ("ESP-La Liga", "0910", "Dep La Coruña", "Adrián López")],
+         ("ESP-La Liga", "0910", "Dep La Coruña", "Adrián López"),
+         # dup pair where one row lacks born (Vittiglio, Pescara 2012):
+         # the year suffix must not NA the name
+         ("ESP-La Liga", "0910", "Valencia", "Marco Vittiglio"),
+         ("ESP-La Liga", "0910", "Valencia", "Marco Vittiglio")],
         names=["league", "season", "team", "player"],
     )
     fbref = pd.DataFrame(
         [["ARG", "FW", 22, 1987, 35, 3100, 34, 11],
          ["ESP", "FW", 21, 1988, 30, 2044, 4, 2],
-         ["ESP", "DF", 22, 1987, 5, 270, 0, 0]],
+         ["ESP", "DF", 22, 1987, 5, 270, 0, 0],
+         ["ITA", "MF", 18, 1994, 10, 500, 1, 0],
+         ["ITA", "MF", None, None, 1, 23, 0, 0]],
         index=idx, columns=cols,
     )
     m_fbref = cached_fetch("fbref", "player_season",
@@ -94,10 +100,12 @@ def test_same_name_same_team_disambiguated(monkeypatch):
                         lambda c, force=False: m_vals)
 
     df = pd.read_parquet(ps.build_player_season("ESP-La Liga", "2009").path)
-    assert len(df) == 3
+    assert len(df) == 5
+    assert df.player_name.notna().all()
     assert not df.duplicated(["league", "season", "team", "player_name"]).any()
     assert set(df.player_name) == {
-        "Lionel Messi", "Adrián López (1988)", "Adrián López (1987)"
+        "Lionel Messi", "Adrián López (1988)", "Adrián López (1987)",
+        "Marco Vittiglio (1994)", "Marco Vittiglio (?)"
     }
     major = df[df.player_name == "Adrián López (1988)"].iloc[0]
     minor = df[df.player_name == "Adrián López (1987)"].iloc[0]
