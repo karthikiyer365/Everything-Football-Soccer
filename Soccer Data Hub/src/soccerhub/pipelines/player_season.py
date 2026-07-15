@@ -41,7 +41,8 @@ def flatten_fbref(df: pd.DataFrame) -> pd.DataFrame:
         CANON.get(tuple(c), "_".join(filter(None, c)).lower()) for c in flat.columns
     ]
     flat = flat.reset_index().rename(columns={"player": "player_name"})
-    return flat
+    # fbref tables occasionally carry a nameless artifact row (Serie A 2012)
+    return flat[flat["player_name"].notna()]
 
 
 def season_end(season: str) -> str:

@@ -25,6 +25,17 @@ def _fake_fbref():
     )
 
 
+def test_flatten_drops_nameless_rows():
+    from soccerhub.pipelines.player_season import flatten_fbref
+    df = _fake_fbref()
+    idx = df.index.to_frame()
+    idx.iloc[0, idx.columns.get_loc("player")] = None
+    df.index = pd.MultiIndex.from_frame(idx)
+    flat = flatten_fbref(df)
+    assert flat.player_name.notna().all()
+    assert len(flat) == len(df) - 1
+
+
 def test_flatten_fbref_canonical_names():
     from soccerhub.pipelines.player_season import flatten_fbref
     flat = flatten_fbref(_fake_fbref())
