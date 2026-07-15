@@ -1,5 +1,17 @@
+import json
+
 import pandas as pd
 import pytest
+
+
+def test_patch_league_config_writes_serie_a_fix(tmp_path, monkeypatch):
+    monkeypatch.setenv("SOCCERDATA_DIR", str(tmp_path))
+    from soccerhub.readers.fbref import _patch_league_config
+
+    _patch_league_config()
+    data = json.loads((tmp_path / "config" / "league_dict.json").read_text())
+    assert data["ITA-Serie A"]["FBref"] == "Serie A (M)"
+    assert data["ITA-Serie A"]["Understat"] == "Serie A"  # full entry, not partial
 
 
 @pytest.fixture(autouse=True)
