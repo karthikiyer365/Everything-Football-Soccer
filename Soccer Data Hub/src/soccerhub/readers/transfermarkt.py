@@ -24,16 +24,25 @@ PLAYER_COLS = [
 ]
 
 
-def fetch_transfermarkt_players(competition: str, force: bool = False) -> Manifest:
-    """Player identity registry (name, DOB, club) for one domestic competition."""
+def fetch_transfermarkt_players(competition: str | None, force: bool = False) -> Manifest:
+    """Player identity registry (name, DOB, club), optionally one competition.
+
+    Filter uses CURRENT club — pass None (full registry incl. retired players)
+    when matching historical seasons.
+    """
 
     def produce():
         df = pd.read_csv(TM_PLAYERS_URL)
-        df = df[df["current_club_domestic_competition_id"] == competition]
+        if competition is not None:
+            df = df[df["current_club_domestic_competition_id"] == competition]
         return df[PLAYER_COLS].reset_index(drop=True)
 
     return cached_fetch(
-        "transfermarkt", "players", {"competition": competition}, produce, force
+        "transfermarkt",
+        "players",
+        {"competition": competition or "ALL"},
+        produce,
+        force,
     )
 
 

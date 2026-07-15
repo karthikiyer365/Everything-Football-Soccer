@@ -72,10 +72,19 @@ def build_player_xref(league: str, season: str, force: bool = False) -> Manifest
         mapping["tm_id"] = mapping["UrlTmarkt"].map(_tm_id_from_url)
         map_by_name = mapping.set_index("PlayerFBref")["tm_id"].to_dict()
 
-        tm = pd.read_parquet(fetch_transfermarkt_players(LEAGUE_TO_TM[league]).path)
+        # full registry, not current-league squads: historical seasons are
+        # full of players who since retired or transferred out
+        tm = pd.read_parquet(fetch_transfermarkt_players(None).path)
         tm["norm"] = tm["name"].map(normalize)
         exact_by_norm = tm.set_index("norm")["player_id"].to_dict()
         tm_year = pd.to_datetime(tm["date_of_birth"], errors="coerce").dt.year
+
+        # token blocking: fuzzy only against registry names sharing a word,
+        # else 32k-candidate scans per leftover make backfills crawl
+        token_idx: dict[str, list[int]] = {}
+        for i, cand in enumerate(tm["norm"]):
+            for tok in cand.split():
+                token_idx.setdefault(tok, []).append(i)
 
         rows = []
         for _, r in players.iterrows():
@@ -90,11 +99,16 @@ def build_player_xref(league: str, season: str, force: bool = False) -> Manifest
             if tm_id is not None:
                 rows.append((name, r["team"], int(tm_id), "exact", 1.0))
                 continue
-            # 3. fuzzy within competition, birth-year guard
+            # 3. fuzzy among token-sharing candidates, birth-year guard
             best_ratio, best_id = 0.0, None
             b = born.get(name)
-            for i, cand in enumerate(tm["norm"]):
-                ratio = _score(normalize(name), cand)
+            norm_name = normalize(name)
+            cand_idx = sorted(
+                {i for tok in norm_name.split() for i in token_idx.get(tok, [])}
+            )
+            for i in cand_idx:
+                cand = tm["norm"].iloc[i]
+                ratio = _score(norm_name, cand)
                 if ratio <= best_ratio:
                     continue
                 ty = tm_year.iloc[i]
