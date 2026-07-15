@@ -44,6 +44,31 @@ def test_fetch_transfermarkt_values_unfiltered(monkeypatch):
     assert m.params == {"competition": "ALL"}
 
 
+def test_fetch_transfermarkt_transfers(monkeypatch):
+    import soccerhub.readers.transfermarkt as tm
+
+    fake = pd.DataFrame(
+        {
+            "player_id": [1, 2],
+            "transfer_date": ["2023-07-01", "2024-01-15"],
+            "transfer_season": ["23/24", "23/24"],
+            "from_club_id": [10, 11],
+            "to_club_id": [20, 21],
+            "from_club_name": ["A", "B"],
+            "to_club_name": ["C", "D"],
+            "transfer_fee": [50000000.0, None],
+            "market_value_in_eur": [40000000.0, 5000000.0],
+            "player_name": ["X", "Y"],
+        }
+    )
+    monkeypatch.setattr(tm.pd, "read_csv", lambda url: fake)
+
+    m = tm.fetch_transfermarkt_transfers()
+    assert m.source == "transfermarkt"
+    assert m.dataset == "transfers"
+    assert m.rows == 2
+
+
 def test_fetch_transfermarkt_players_filters_and_trims(monkeypatch):
     import soccerhub.readers.transfermarkt as tm
 

@@ -10,7 +10,9 @@ CHUNK = 500
 CONFLICT_KEY = "league,season,team,player_name"
 
 
-def push_to_supabase(manifest: Manifest, table: str) -> int:
+def push_to_supabase(
+    manifest: Manifest, table: str, on_conflict: str = CONFLICT_KEY
+) -> int:
     client = create_client(
         os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"]
     )
@@ -25,6 +27,6 @@ def push_to_supabase(manifest: Manifest, table: str) -> int:
     records = df.astype(object).where(pd.notna(df), None).to_dict("records")
     for i in range(0, len(records), CHUNK):
         client.table(table).upsert(
-            records[i : i + CHUNK], on_conflict=CONFLICT_KEY
+            records[i : i + CHUNK], on_conflict=on_conflict
         ).execute()
     return len(records)

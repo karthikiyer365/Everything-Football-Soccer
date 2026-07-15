@@ -46,6 +46,25 @@ def fetch_transfermarkt_players(competition: str | None, force: bool = False) ->
     )
 
 
+TM_TRANSFERS_URL = (
+    "https://www.kaggle.com/api/v1/datasets/download/"
+    "davidcariboo/player-scores?fileName=transfers.csv"
+)
+
+
+def fetch_transfermarkt_transfers(force: bool = False) -> Manifest:
+    """All transfer events (fee, from/to club, date), every league."""
+
+    def produce():
+        df = pd.read_csv(TM_TRANSFERS_URL)
+        df = df.rename(columns={"player_id": "tm_id"})
+        # same-day duplicate rows (loan bookkeeping) collide with the
+        # (tm_id, transfer_date) primary key downstream
+        return df.drop_duplicates(["tm_id", "transfer_date"], keep="last")
+
+    return cached_fetch("transfermarkt", "transfers", {}, produce, force)
+
+
 def fetch_transfermarkt_values(competition: str | None, force: bool = False) -> Manifest:
     """Player market valuations, optionally filtered to one domestic competition.
 
