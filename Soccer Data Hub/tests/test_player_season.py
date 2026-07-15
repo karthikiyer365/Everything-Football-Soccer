@@ -38,6 +38,57 @@ def test_season_end():
     assert season_end("2023") == "2024-06-30"
 
 
+def test_same_name_same_team_disambiguated(monkeypatch):
+    import soccerhub.pipelines.player_season as ps
+    from soccerhub.cache import cached_fetch
+
+    cols = pd.MultiIndex.from_tuples([
+        ("nation", ""), ("pos", ""), ("age", ""), ("born", ""),
+        ("Playing Time", "MP"), ("Playing Time", "Min"),
+        ("Performance", "Gls"), ("Performance", "Ast"),
+    ])
+    idx = pd.MultiIndex.from_tuples(
+        [("ESP-La Liga", "0910", "Dep La Coruña", "Adrián López"),
+         ("ESP-La Liga", "0910", "Dep La Coruña", "Adrián López")],
+        names=["league", "season", "team", "player"],
+    )
+    fbref = pd.DataFrame(
+        [["ESP", "FW", 21, 1988, 30, 2044, 4, 2],
+         ["ESP", "DF", 22, 1987, 5, 270, 0, 0]],
+        index=idx, columns=cols,
+    )
+    m_fbref = cached_fetch("fbref", "player_season",
+                           {"league": "ESP-La Liga", "season": "2009"},
+                           lambda: fbref)
+    monkeypatch.setattr(ps, "fetch_fbref_season", lambda l, s, force=False: m_fbref)
+
+    xref = pd.DataFrame({
+        "fbref_name": ["Adrián López"], "team": ["Dep La Coruña"],
+        "tm_id": pd.array([55], dtype="Int64"),
+        "method": ["exact"], "confidence": [1.0],
+    })
+    m_xref = cached_fetch("xref", "players",
+                          {"league": "ESP-La Liga", "season": "2009"},
+                          lambda: xref)
+    monkeypatch.setattr(ps, "build_player_xref", lambda l, s, force=False: m_xref)
+
+    vals = pd.DataFrame({"player_id": [55], "date": ["2010-05-01"],
+                         "market_value_in_eur": [10_000_000]})
+    m_vals = cached_fetch("transfermarkt", "valuations", {"competition": "ALL"},
+                          lambda: vals)
+    monkeypatch.setattr(ps, "fetch_transfermarkt_values",
+                        lambda c, force=False: m_vals)
+
+    df = pd.read_parquet(ps.build_player_season("ESP-La Liga", "2009").path)
+    assert len(df) == 2
+    assert not df.duplicated(["league", "season", "team", "player_name"]).any()
+    assert set(df.player_name) == {"Adrián López (1988)", "Adrián López (1987)"}
+    major = df[df.player_name == "Adrián López (1988)"].iloc[0]
+    minor = df[df.player_name == "Adrián López (1987)"].iloc[0]
+    assert major["tm_id"] == 55  # most-minutes row keeps the name-based match
+    assert pd.isna(minor["tm_id"]) and minor["xref_method"] == "ambiguous"
+
+
 def test_build_player_season_merges_value(monkeypatch):
     import soccerhub.pipelines.player_season as ps
     from soccerhub.cache import cached_fetch

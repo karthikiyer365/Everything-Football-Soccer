@@ -80,6 +80,30 @@ def build_player_season(league: str, season: str, force: bool = False) -> Manife
         merged = merged.merge(
             latest, left_on="tm_id", right_on="player_id", how="left"
         ).drop(columns=["player_id"])
+
+        # two different players, same name, same team (Adrián López x2,
+        # Deportivo 2009): name-keyed xref matched both to one tm_id and the
+        # DB primary key rejects the pair. Disambiguate the name with birth
+        # year; trust the tm match only for the biggest-minutes row.
+        key = ["league", "season", "team", "player_name"]
+        dups = merged.duplicated(key, keep=False)
+        if dups.any():
+            top = merged.loc[dups].groupby(key)["minutes"].transform("max")
+            minor = dups & (merged["minutes"] < top)
+            merged.loc[minor, ["tm_id", "market_value_in_eur", "value_date"]] = pd.NA
+            merged.loc[minor, "xref_method"] = "ambiguous"
+            merged.loc[minor, "xref_confidence"] = 0.0
+            merged.loc[dups, "player_name"] = (
+                merged.loc[dups, "player_name"] + " ("
+                + merged.loc[dups, "birth_year"].astype("Int64").astype(str) + ")"
+            )
+            # ponytail: same name + team + birth year would still collide;
+            # keep the bigger spell if that ever happens
+            merged = (
+                merged.sort_values("minutes", ascending=False)
+                .drop_duplicates(key, keep="first")
+                .sort_index()
+            )
         return merged
 
     return cached_fetch(
