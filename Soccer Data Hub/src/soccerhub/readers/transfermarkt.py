@@ -58,6 +58,11 @@ def fetch_transfermarkt_transfers(force: bool = False) -> Manifest:
     def produce():
         df = pd.read_csv(TM_TRANSFERS_URL)
         df = df.rename(columns={"player_id": "tm_id"})
+        # source has a few placeholder rows dated years ahead (contract-end
+        # entries, e.g. 2030) — a transfer can't be further out than the
+        # upcoming window
+        horizon = (pd.Timestamp.now() + pd.DateOffset(months=8)).strftime("%Y-%m-%d")
+        df = df[df["transfer_date"] <= horizon]
         # same-day duplicate rows (loan bookkeeping) collide with the
         # (tm_id, transfer_date) primary key downstream
         return df.drop_duplicates(["tm_id", "transfer_date"], keep="last")

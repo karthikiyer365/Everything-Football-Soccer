@@ -49,6 +49,34 @@ def season_end(season: str) -> str:
     return f"{int(season) + 1}-06-30"
 
 
+RATE_COLS = [
+    "goals_per90", "assists_per90", "goals_assists_per90",
+    "non_penalty_goals_per90", "non_penalty_goals_assists_per90",
+]
+MIN_MINUTES_FOR_RATES = 450  # ponytail: one global floor; 5 full games
+
+
+def clean(df: pd.DataFrame) -> pd.DataFrame:
+    """Validity rules applied to every merged frame before caching/pushing.
+
+    - per-90 rates on tiny samples are noise (1 goal in 4 min = 22.5/90),
+      so they are nulled below the minutes floor; counting stats stay raw
+    - age recomputed from birth_year (fbref snapshots drift by league)
+    - value_is_stale: TM stopped revaluing >1yr before season end
+    """
+    df = df.copy()
+    thin = df["minutes"] < MIN_MINUTES_FOR_RATES
+    df.loc[thin, [c for c in RATE_COLS if c in df.columns]] = pd.NA
+
+    df["age"] = (df["season"].astype(int) - df["birth_year"]).astype("Int64")
+    df["primary_position"] = df["position"].str.split(",").str[0]
+
+    end = pd.to_datetime(df["season"].map(season_end))
+    vdate = pd.to_datetime(df["value_date"], errors="coerce")
+    df["value_is_stale"] = ((end - vdate).dt.days > 365).fillna(False)
+    return df
+
+
 def build_player_season(league: str, season: str, force: bool = False) -> Manifest:
     """FBref season stats + latest market value on/before season end."""
 
@@ -105,7 +133,7 @@ def build_player_season(league: str, season: str, force: bool = False) -> Manife
                 .drop_duplicates(key, keep="first")
                 .sort_index()
             )
-        return merged
+        return clean(merged)
 
     return cached_fetch(
         "hub", "player_season", {"league": league, "season": season}, produce, force

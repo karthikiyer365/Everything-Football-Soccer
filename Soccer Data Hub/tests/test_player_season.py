@@ -94,6 +94,32 @@ def test_same_name_same_team_disambiguated(monkeypatch):
     assert pd.isna(minor["tm_id"]) and minor["xref_method"] == "ambiguous"
 
 
+def test_clean_rules():
+    from soccerhub.pipelines.player_season import clean
+    df = pd.DataFrame({
+        "season": ["2023", "2023"],
+        "position": ["MF,FW", "GK"],
+        "birth_year": [2001, 1990],
+        "age": [21, 40],  # 40 wrong: 2023-1990=33 -> recomputed
+        "minutes": [2000, 100],
+        "goals_per90": [0.5, 9.0],
+        "assists_per90": [0.3, 4.5],
+        "goals_assists_per90": [0.8, 13.5],
+        "non_penalty_goals_per90": [0.4, 9.0],
+        "non_penalty_goals_assists_per90": [0.7, 13.5],
+        "value_date": ["2024-05-01", "2022-01-01"],  # 2nd >1yr before 2024-06-30
+        "market_value_in_eur": [1e7, 1e6],
+    })
+    out = clean(df)
+    assert out.primary_position.tolist() == ["MF", "GK"]
+    assert out.age.tolist() == [22, 33]  # season+1 minus birth year? no: 2023-2001=22
+    assert out.loc[0, "goals_per90"] == 0.5          # enough minutes: kept
+    assert pd.isna(out.loc[1, "goals_per90"])        # 100 min: rate nulled
+    assert pd.isna(out.loc[1, "goals_assists_per90"])
+    assert out.loc[1, "minutes"] == 100              # counting stats untouched
+    assert out.value_is_stale.tolist() == [False, True]
+
+
 def test_build_player_season_merges_value(monkeypatch):
     import soccerhub.pipelines.player_season as ps
     from soccerhub.cache import cached_fetch
