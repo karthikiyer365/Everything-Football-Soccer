@@ -15,6 +15,13 @@ def push_to_supabase(manifest: Manifest, table: str) -> int:
         os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"]
     )
     df = pd.read_parquet(manifest.path)
+    for col in df.columns:
+        # pandas upcasts nullable ints to float ('25000000.0' breaks bigint
+        # columns in postgres) — send whole-number floats back as ints
+        if pd.api.types.is_float_dtype(df[col]):
+            s = df[col].dropna()
+            if len(s) and (s % 1 == 0).all():
+                df[col] = df[col].astype("Int64")
     records = df.astype(object).where(pd.notna(df), None).to_dict("records")
     for i in range(0, len(records), CHUNK):
         client.table(table).upsert(
