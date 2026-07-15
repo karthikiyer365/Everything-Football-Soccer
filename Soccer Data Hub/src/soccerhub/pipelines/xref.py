@@ -25,6 +25,25 @@ LEAGUE_TO_TM = {
 
 FUZZY_FLOOR = 0.85  # ponytail: single global threshold, tune per-league if noisy
 
+# Manual review verdicts: fbref_name -> tm_id (or None = force unmatched).
+# For pairs no automatic rule can settle (e.g. Nathan Doyle vs Nathan Dyer:
+# different players, same birth year, name ratio above the floor).
+OVERRIDES: dict[str, int | None] = {
+    "Nathan Doyle": None,  # vs Nathan Dyer: same birth year, different player
+    # mononym TM names, manually verified via birth year + club + position:
+    "Alysson Edward": 1005583,   # Alysson, Aston Villa
+    "Bruno": 51528,              # Bruno Saltor, Brighton
+    "Eduardo da Silva": 24633,   # Eduardo, Arsenal->Shakhtar
+    "Estêvão Willian": 1056993,  # Estêvão, Chelsea
+    "Gabriel Magalhães": 435338, # Gabriel, Arsenal
+    "Guly do Prado": 22801,      # Guly, Southampton
+    "Henrique Hilário": 13886,   # Hilário, Chelsea GK
+    "José Bosingwa": 9813,       # Bosingwa, Chelsea/QPR
+    "Jota": 176591,              # Jota Peleteiro, Aston Villa
+    "Maicon Sisenando": 18301,   # Maicon, Man City
+    "Mohamed Gedo": 104941,      # Gedo, Hull City
+}
+
 
 def normalize(name: str) -> str:
     s = unicodedata.normalize("NFKD", name)
@@ -45,9 +64,12 @@ def _tm_id_from_url(url: str):
 def _score(a: str, b: str) -> float:
     """Name similarity. Token-subset beats raw ratio: 'angel di maria' vs
     'angel di maria hernandez' is the same person (short name inside legal
-    name) but SequenceMatcher alone scores it 0.74 — below the floor."""
+    name) but SequenceMatcher alone scores it 0.74 — below the floor.
+    The shorter name needs >= 2 tokens: mononyms ('Alan', 'Diego') are
+    substrings of half the league and proved to be pure false-positive fuel.
+    """
     ta, tb = set(a.split()), set(b.split())
-    if ta and tb and (ta <= tb or tb <= ta):
+    if min(len(ta), len(tb)) >= 2 and (ta <= tb or tb <= ta):
         return 0.95
     return SequenceMatcher(None, a, b).ratio()
 
@@ -70,6 +92,9 @@ def build_player_xref(league: str, season: str, force: bool = False) -> Manifest
 
         mapping = _load_mapping()
         mapping["tm_id"] = mapping["UrlTmarkt"].map(_tm_id_from_url)
+        # homonyms (two Aaron Ramseys) make a name-keyed dict pick arbitrarily
+        # -> drop ambiguous names, let year-guarded exact/fuzzy resolve them
+        mapping = mapping.drop_duplicates("PlayerFBref", keep=False)
         map_by_name = mapping.set_index("PlayerFBref")["tm_id"].to_dict()
 
         # full registry, not current-league squads: historical seasons are
@@ -86,22 +111,40 @@ def build_player_xref(league: str, season: str, force: bool = False) -> Manifest
             for tok in cand.split():
                 token_idx.setdefault(tok, []).append(i)
 
+        year_by_id = dict(zip(tm["player_id"], tm_year))
+
         rows = []
         for _, r in players.iterrows():
             name = r["player"]
-            # 1. mapping file
+            b = born.get(name)
+
+            def year_ok(tm_id) -> bool:
+                ty = year_by_id.get(tm_id)
+                return not (
+                    pd.notna(b) and ty is not None and pd.notna(ty)
+                    and abs(int(b) - int(ty)) > 1
+                )
+
+            # 0. manual review verdicts beat every rung
+            if name in OVERRIDES:
+                tm_id = OVERRIDES[name]
+                if tm_id is None:
+                    rows.append((name, r["team"], None, "unmatched", 0.0))
+                else:
+                    rows.append((name, r["team"], int(tm_id), "override", 1.0))
+                continue
+            # 1. mapping file (year-guarded: file itself has stale/homonym rows)
             tm_id = map_by_name.get(name)
-            if tm_id is not None and pd.notna(tm_id):
+            if tm_id is not None and pd.notna(tm_id) and year_ok(int(tm_id)):
                 rows.append((name, r["team"], int(tm_id), "mapping_file", 1.0))
                 continue
-            # 2. exact normalized
+            # 2. exact normalized (year-guarded: homonyms share names)
             tm_id = exact_by_norm.get(normalize(name))
-            if tm_id is not None:
+            if tm_id is not None and year_ok(int(tm_id)):
                 rows.append((name, r["team"], int(tm_id), "exact", 1.0))
                 continue
             # 3. fuzzy among token-sharing candidates, birth-year guard
             best_ratio, best_id = 0.0, None
-            b = born.get(name)
             norm_name = normalize(name)
             cand_idx = sorted(
                 {i for tok in norm_name.split() for i in token_idx.get(tok, [])}
