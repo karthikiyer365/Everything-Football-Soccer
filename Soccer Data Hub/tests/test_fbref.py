@@ -4,6 +4,31 @@ import pandas as pd
 import pytest
 
 
+def test_season_to_code():
+    from soccerhub.readers.fbref import _season_to_code
+    assert _season_to_code("2021") == "2122"  # the ambiguous one: NOT 20-21
+    assert _season_to_code("2008") == "0809"
+    assert _season_to_code("1999") == "9900"
+
+
+def test_fetch_passes_unambiguous_code(tmp_path, monkeypatch):
+    monkeypatch.setenv("SOCCERHUB_CACHE", str(tmp_path))
+    import soccerhub.readers.fbref as fb
+
+    captured = {}
+
+    class FakeFBref:
+        def __init__(self, leagues, seasons):
+            captured["seasons"] = seasons
+        def read_player_season_stats(self):
+            return pd.DataFrame({"x": [1]})
+
+    monkeypatch.setattr(fb.sd, "FBref", FakeFBref)
+    m = fb.fetch_fbref_season("ENG-Premier League", "2021")
+    assert captured["seasons"] == "2122"
+    assert m.params["season"] == "2021"  # canonical label unchanged in cache key
+
+
 def test_patch_league_config_writes_serie_a_fix(tmp_path, monkeypatch):
     monkeypatch.setenv("SOCCERDATA_DIR", str(tmp_path))
     from soccerhub.readers.fbref import _patch_league_config

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SoccerHub — every number on the pitch</title>
+<meta name="description" content="Open football analytics: 18 seasons of Europe's big five leagues — player stats, market values and transfers, cross-matched into one database.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<style>
+  :root{
+    --grass:#122b1a; --grass-lt:#16321f;
+    --line:#f2f5ef; --amber:#ffb43a; --ink:#14231a;
+    --chalk-y:#e8d47a; --muted:#9fb69c; --tag:#8fae8b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--grass);color:var(--line);
+       font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+  .disp{font-family:"Avenir Next Condensed","Arial Narrow","Helvetica Neue Condensed",Impact,sans-serif;
+        text-transform:uppercase;letter-spacing:.04em;font-stretch:condensed}
+  .nums{font-variant-numeric:tabular-nums}
+
+  .pitch{position:relative;min-height:100vh;overflow:hidden;
+      background:
+      radial-gradient(900px 340px at 50% -60px, rgba(220,236,255,.10), transparent 70%),
+      repeating-linear-gradient(0deg,var(--grass) 0 72px,var(--grass-lt) 72px 144px)}
+  .pitch svg.lines,.pitch svg.ballsvg{position:absolute;inset:0;width:100%;height:100%}
+  .pitch svg.ballsvg{pointer-events:none}
+  @media (prefers-reduced-motion: reduce){ .pitch svg.ballsvg{display:none} }
+
+  header.head{position:relative;text-align:center;padding:52px 16px 0}
+  .head h1{font-size:clamp(2.2rem,6vw,3.8rem);margin:0;line-height:1;
+           text-shadow:0 2px 0 rgba(0,0,0,.45)}
+  .head p{margin:12px auto 0;max-width:52ch;color:var(--muted)}
+  .kick{display:inline-block;margin-top:20px;padding:12px 36px;border-radius:999px;
+        font-weight:700;text-decoration:none;letter-spacing:.06em;
+        text-transform:uppercase;font-size:.85rem;background:var(--amber);color:#20160a}
+  .kick:hover{background:#ffc76b}
+  .kick:focus-visible{outline:3px solid var(--line);outline-offset:2px}
+
+  .formation{position:relative;display:grid;gap:20px;
+             grid-template-columns:repeat(3,minmax(0,1fr));
+             max-width:980px;margin:52px auto 0;padding:0 28px 110px}
+  .row-tag{grid-column:1/-1;font-size:.72rem;letter-spacing:.2em;
+           text-transform:uppercase;color:var(--tag);margin-top:6px}
+  a.pos,article.pos{display:block;border-radius:4px;padding:18px 18px 14px;
+      background:rgba(5,14,8,.78);border:1px solid rgba(242,245,239,.22);
+      backdrop-filter:blur(2px);color:inherit;text-decoration:none}
+  .pos .shirt{display:flex;align-items:baseline;gap:10px}
+  .pos .no{font-size:1.9rem;font-weight:700;line-height:1;color:var(--amber)}
+  .pos h2{margin:0;font-size:1.05rem;letter-spacing:.05em}
+  .pos p{margin:8px 0 0;font-size:.86rem;line-height:1.45;color:var(--muted)}
+  .pos .stat{margin-top:10px;font-size:.78rem;letter-spacing:.08em;
+             text-transform:uppercase;color:var(--chalk-y)}
+  .pos.soon{opacity:.55;border-style:dashed}
+  a.pos:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+  @media (prefers-reduced-motion: no-preference){
+    .pos{transition:transform .18s ease,border-color .18s ease}
+    a.pos:hover{transform:translateY(-3px);border-color:var(--amber)}
+  }
+  @media(max-width:720px){.formation{grid-template-columns:1fr 1fr}}
+  @media(max-width:480px){.formation{grid-template-columns:1fr}}
+
+  footer{position:relative;text-align:center;padding:0 16px 34px;
+         font-size:.8rem;color:var(--tag)}
+  footer a{color:var(--chalk-y)}
+</style>
+</head>
+<body>
+<main class="pitch">
+  <svg class="lines" viewBox="0 0 1000 960" preserveAspectRatio="none" aria-hidden="true">
+    <g fill="none" stroke="#f2f5ef" stroke-opacity=".28" stroke-width="3">
+      <rect x="30" y="30" width="940" height="900"/>
+      <line x1="30" y1="480" x2="970" y2="480"/>
+      <circle cx="500" cy="480" r="90"/>
+      <rect x="290" y="30" width="420" height="130"/>
+      <rect x="290" y="800" width="420" height="130"/>
+      <rect x="400" y="30" width="200" height="55"/>
+      <rect x="400" y="875" width="200" height="55"/>
+    </g>
+  </svg>
+  <svg class="ballsvg" viewBox="0 0 1000 960" preserveAspectRatio="none" aria-hidden="true">
+    <path id="pass" fill="none" stroke="var(--amber)" stroke-opacity=".35"
+          stroke-width="2.5" stroke-dasharray="4 10"
+          d="M 500 900 C 300 780 220 640 260 540 C 300 440 460 470 500 480
+             C 560 490 700 460 730 380 C 760 300 620 260 500 300
+             C 380 340 300 300 330 220"/>
+    <circle r="9" fill="var(--line)">
+      <animateMotion dur="14s" repeatCount="indefinite" rotate="none">
+        <mpath href="#pass"/>
+      </animateMotion>
+    </circle>
+    <circle r="4" fill="var(--ink)">
+      <animateMotion dur="14s" repeatCount="indefinite" rotate="none">
+        <mpath href="#pass"/>
+      </animateMotion>
+    </circle>
+  </svg>
+
+  <header class="head">
+    <h1 class="disp">Every number on the pitch</h1>
+    <p>Eighteen seasons of Europe's big five leagues — stats, market values and
+       transfers, cross-matched into one open database. Pick a position to start.</p>
+    <a class="kick" href="player.html">Kick off</a>
+  </header>
+
+  <nav class="formation" aria-label="Dashboards">
+    <div class="row-tag">Front three — player surfaces</div>
+    <a class="pos" href="player.html">
+      <div class="shirt"><span class="no nums">9</span><h2 class="disp">Player Dashboard</h2></div>
+      <p>A career on one page: goals, minutes and market value season by season, across leagues.</p>
+      <div class="stat nums">49,692 player-seasons</div>
+    </a>
+    <article class="pos soon">
+      <div class="shirt"><span class="no nums">7</span><h2 class="disp">Scouting Screens</h2></div>
+      <p>Moneyball filters: under-21, high output per 90, priced under the market.</p>
+      <div class="stat">In training</div>
+    </article>
+    <article class="pos soon">
+      <div class="shirt"><span class="no nums">11</span><h2 class="disp">Value vs Output</h2></div>
+      <p>Who out-produced their price tag — and who never repaid it.</p>
+      <div class="stat">In training</div>
+    </article>
+
+    <div class="row-tag">Midfield — market surfaces</div>
+    <article class="pos soon">
+      <div class="shirt"><span class="no nums">8</span><h2 class="disp">Transfer Market</h2></div>
+      <p>Fees, moves and windows; follow a player across clubs and leagues.</p>
+      <div class="stat nums">35,123 transfers · in training</div>
+    </article>
+    <article class="pos soon">
+      <div class="shirt"><span class="no nums">6</span><h2 class="disp">League Inflation</h2></div>
+      <p>Median squad value 2008 → 2025: how fast each league's money grew.</p>
+      <div class="stat">In training</div>
+    </article>
+    <article class="pos soon">
+      <div class="shirt"><span class="no nums">10</span><h2 class="disp">Age Curves</h2></div>
+      <p>When strikers peak, when keepers fade — every position's arc.</p>
+      <div class="stat">In training</div>
+    </article>
+
+    <div class="row-tag">Back line — coming windows</div>
+    <article class="pos soon">
+      <div class="shirt"><span class="no nums">4</span><h2 class="disp">Match Center</h2></div>
+      <p>Fixtures, results and form lines.</p>
+      <div class="stat">Next window</div>
+    </article>
+    <article class="pos soon">
+      <div class="shirt"><span class="no nums">5</span><h2 class="disp">Shot Maps</h2></div>
+      <p>Event-level detail from StatsBomb open data.</p>
+      <div class="stat">Next window</div>
+    </article>
+    <article class="pos soon">
+      <div class="shirt"><span class="no nums">3</span><h2 class="disp">xG Studio</h2></div>
+      <p>Expected goals vs the real thing.</p>
+      <div class="stat">Next window</div>
+    </article>
+  </nav>
+
+  <footer>
+    Data: FBref · StatsBomb open data · Transfermarkt (via
+    <a href="https://github.com/dcaribou/transfermarkt-datasets">transfermarkt-datasets</a>)
+    — refreshed twice weekly.
+  </footer>
+</main>
+</body>
+</html>

@@ -78,11 +78,18 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def build_player_season(league: str, season: str, force: bool = False) -> Manifest:
-    """FBref season stats + latest market value on/before season end."""
+def build_player_season(
+    league: str, season: str, force: bool = False, refetch: bool = False
+) -> Manifest:
+    """FBref season stats + latest market value on/before season end.
+
+    force rebuilds the merge; refetch additionally re-downloads source data.
+    """
 
     def produce():
-        stats = flatten_fbref(pd.read_parquet(fetch_fbref_season(league, season).path))
+        stats = flatten_fbref(
+            pd.read_parquet(fetch_fbref_season(league, season, force=refetch).path)
+        )
         stats["season"] = season  # canonical start-year label, not fbref's '2324'
 
         xref = pd.read_parquet(build_player_xref(league, season).path).rename(
@@ -98,7 +105,7 @@ def build_player_season(league: str, season: str, force: bool = False) -> Manife
 
         # None = all competitions: valuations are keyed by CURRENT club, so a
         # league filter would drop every player who transferred out since
-        vals = pd.read_parquet(fetch_transfermarkt_values(None).path)
+        vals = pd.read_parquet(fetch_transfermarkt_values(None, force=refetch).path)
         vals = vals[vals["date"] <= season_end(season)]
         latest = (
             vals.sort_values("date")

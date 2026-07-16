@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Player Dashboard — SoccerHub</title>
+<meta name="description" content="One career on one page: goals, minutes and market value season by season, across Europe's big five leagues.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<style>
+  :root{
+    --grass:#122b1a; --grass-lt:#16321f; --card:#0a1a0e;
+    --line:#f2f5ef; --muted:#9fb69c; --tag:#8fae8b; --border:rgba(242,245,239,.22);
+    --amber:#ffb43a; --green:#8fd18a; --chalk-y:#e8d47a; --blue:#5aa9f0;
+    --grid:rgba(242,245,239,.10); --axis:rgba(242,245,239,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:
+       repeating-linear-gradient(0deg,var(--grass) 0 72px,var(--grass-lt) 72px 144px);
+       color:var(--line);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+       min-height:100vh}
+  .disp{font-family:"Avenir Next Condensed","Arial Narrow","Helvetica Neue Condensed",Impact,sans-serif;
+        text-transform:uppercase;letter-spacing:.04em;font-stretch:condensed}
+  .nums{font-variant-numeric:tabular-nums}
+  a{color:var(--chalk-y)}
+
+  .top{position:sticky;top:0;z-index:5;display:flex;gap:16px;align-items:center;
+       padding:12px 20px;background:rgba(5,14,8,.92);backdrop-filter:blur(4px);
+       border-bottom:1px solid var(--border)}
+  .top a.home{color:var(--line);text-decoration:none;font-size:1.05rem;white-space:nowrap}
+  .searchwrap{position:relative;flex:1;max-width:440px}
+  #search{width:100%;padding:9px 14px;border-radius:999px;border:1px solid var(--border);
+       background:var(--card);color:var(--line);font:inherit;font-size:.95rem}
+  #search::placeholder{color:var(--tag)}
+  #search:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+  #results{position:absolute;top:110%;left:0;right:0;background:var(--card);
+       border:1px solid var(--border);border-radius:6px;overflow:hidden;display:none;
+       max-height:320px;overflow-y:auto}
+  #results button{display:flex;justify-content:space-between;gap:12px;width:100%;
+       padding:10px 14px;border:0;background:none;color:var(--line);font:inherit;
+       font-size:.9rem;text-align:left;cursor:pointer}
+  #results button:hover,#results button:focus-visible{background:rgba(255,180,58,.12);outline:none}
+  #results .sub{color:var(--tag);font-size:.8rem;white-space:nowrap}
+
+  main{max-width:960px;margin:0 auto;padding:28px 20px 80px}
+  .empty{color:var(--muted);text-align:center;padding:80px 20px;max-width:46ch;margin:0 auto}
+  .empty .disp{color:var(--line);font-size:1.6rem}
+
+  .hero{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 18px;margin:8px 0 4px}
+  .hero h1{font-size:clamp(1.9rem,5vw,3rem);margin:0;line-height:1}
+  .hero .meta{color:var(--muted);font-size:.95rem}
+  .flag{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;
+        border:1px solid var(--border);border-radius:999px;padding:2px 10px;color:var(--chalk-y)}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+         gap:12px;margin:20px 0 8px}
+  .tile{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px 14px}
+  .tile .k{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--tag)}
+  .tile .v{font-size:1.5rem;font-weight:700;margin-top:2px}
+  .tile .s{font-size:.78rem;color:var(--muted)}
+
+  section.chart{background:var(--card);border:1px solid var(--border);border-radius:4px;
+        padding:16px 16px 10px;margin-top:16px}
+  section.chart h2{margin:0 0 2px;font-size:.8rem;letter-spacing:.16em;
+        text-transform:uppercase;color:var(--tag);display:flex;gap:8px;align-items:center}
+  .swatch{width:10px;height:10px;border-radius:2px;display:inline-block}
+  .chartbox{position:relative}
+  .chartbox svg{width:100%;height:auto;display:block}
+  #tip{position:fixed;z-index:9;pointer-events:none;display:none;background:#050e08;
+       border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-size:.8rem;
+       color:var(--line);box-shadow:0 4px 16px rgba(0,0,0,.5)}
+  #tip .t{color:var(--tag);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
+
+  .season-log{margin-top:22px;background:var(--card);border:1px solid var(--border);
+       border-radius:4px;overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:.88rem;min-width:640px}
+  caption{text-align:left;padding:14px 16px 6px;font-size:.8rem;letter-spacing:.16em;
+       text-transform:uppercase;color:var(--tag)}
+  th,td{padding:8px 14px;text-align:right;border-top:1px solid rgba(242,245,239,.08)}
+  th{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--tag);
+     font-weight:600;border-top:0}
+  th:first-child,td:first-child,th:nth-child(2),td:nth-child(2),
+  th:nth-child(3),td:nth-child(3){text-align:left}
+  tbody tr:hover{background:rgba(255,180,58,.06)}
+  .dim{color:var(--muted)}
+  .warn{color:var(--chalk-y);cursor:help}
+</style>
+</head>
+<body>
+<nav class="top">
+  <a class="home disp" href="index.html">⚽ SoccerHub</a>
+  <div class="searchwrap">
+    <input id="search" type="search" placeholder="Search any player, 2008–2025…"
+           autocomplete="off" aria-label="Search player">
+    <div id="results" role="listbox"></div>
+  </div>
+</nav>
+
+<main id="main">
+  <div class="empty" id="empty">
+    <p class="disp">Pick a player</p>
+    <p>Search 49,692 player-seasons across the Premier League, La Liga, Bundesliga,
+       Serie A and Ligue 1 — 2008 to today.</p>
+  </div>
+</main>
+<div id="tip" role="status"></div>
+
+<script>
+const SUPABASE_URL = "https://rgnzemkdldohplwbxxwy.supabase.co";
+const ANON_KEY = "sb_publishable_Qy0bJ4CdrxffuJGNq12ebw_r0-Z3qD-";
+
+async function hub(table, params){
+  const q = new URLSearchParams(params);
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${q}`,
+                        {headers:{apikey: ANON_KEY}});
+  if(!r.ok) throw new Error(`${table}: ${r.status}`);
+  return r.json();
+}
+
+const eur = v => v==null ? "—" :
+  v >= 1e6 ? `€${(v/1e6).toFixed(v>=10e6?0:1)}M` : `€${Math.round(v/1e3)}k`;
+const esc = s => String(s).replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ---------- search ---------- */
+const box = document.getElementById("search");
+const list = document.getElementById("results");
+let deb;
+box.addEventListener("input", () => {
+  clearTimeout(deb);
+  const q = box.value.trim();
+  if(q.length < 3){ list.style.display = "none"; return; }
+  deb = setTimeout(() => runSearch(q), 300);
+});
+document.addEventListener("click", e => {
+  if(!e.target.closest(".searchwrap")) list.style.display = "none";
+});
+
+async function runSearch(q){
+  const rows = await hub("player_season", {
+    select: "player_name,tm_id,team,season,league",
+    player_name: `ilike.*${q}*`, order: "season.desc", limit: "60"});
+  const seen = new Set(); const picks = [];
+  for(const r of rows){
+    const key = r.tm_id ?? `name:${r.player_name}`;
+    if(seen.has(key)) continue;
+    seen.add(key); picks.push(r);
+    if(picks.length === 8) break;
+  }
+  list.innerHTML = picks.length ? "" : "<button disabled>No players found</button>";
+  for(const p of picks){
+    const b = document.createElement("button");
+    b.setAttribute("role","option");
+    b.innerHTML = `<span>${esc(p.player_name)}</span>
+       <span class="sub">${esc(p.team)} · ${esc(p.season)}</span>`;
+    b.onclick = () => {
+      list.style.display = "none"; box.value = "";
+      const u = new URL(location);
+      u.search = p.tm_id != null ? `?tm=${p.tm_id}`
+               : `?name=${encodeURIComponent(p.player_name)}`;
+      history.pushState({}, "", u);
+      load();
+    };
+    list.appendChild(b);
+  }
+  list.style.display = "block";
+}
+
+/* ---------- page load ---------- */
+window.addEventListener("popstate", load);
+load();
+
+async function load(){
+  const u = new URLSearchParams(location.search);
+  const main = document.getElementById("main");
+  if(!u.has("tm") && !u.has("name")) return;
+  main.innerHTML = `<div class="empty">Loading…</div>`;
+  const params = {select: "*", order: "season"};
+  if(u.has("tm")) params.tm_id = `eq.${u.get("tm")}`;
+  else params.player_name = `eq.${u.get("name")}`;
+  let rows, moves = [];
+  try{
+    rows = await hub("player_season", params);
+    if(u.has("tm"))
+      moves = await hub("transfers",
+        {select:"transfer_date,from_club_name,to_club_name,transfer_fee,market_value_in_eur",
+         tm_id:`eq.${u.get("tm")}`, order:"transfer_date"});
+  }
+  catch(e){ main.innerHTML =
+    `<div class="empty">Could not reach the database (${esc(e.message)}). Try again.</div>`;
+    return; }
+  if(!rows.length){ main.innerHTML =
+    `<div class="empty">No seasons found for this player.</div>`; return; }
+  render(rows, moves);
+}
+
+/* transfer date -> season start-year label ('2022-07-01' -> '2022') */
+const moveSeason = d => {
+  const [y,m] = d.split("-").map(Number);
+  return String(m >= 7 ? y : y-1);
+};
+
+function render(rows, moves = []){
+  const last = rows[rows.length-1];
+  const sum = k => rows.reduce((a,r)=>a+(r[k]||0),0);
+  const latestVal = [...rows].reverse().find(r=>r.market_value_in_eur!=null);
+  const peakVal = rows.reduce((a,r)=>Math.max(a,r.market_value_in_eur||0),0);
+  document.title = `${last.player_name} — SoccerHub`;
+
+  const flags = [];
+  if(latestVal && latestVal.value_is_stale)
+    flags.push(`<span class="flag" title="Transfermarkt stopped re-valuing this player more than a year before that season's end">⚠ value may be stale</span>`);
+  if(last.xref_method === "unmatched")
+    flags.push(`<span class="flag" title="No Transfermarkt identity matched — market values unavailable">no market data</span>`);
+
+  document.getElementById("main").innerHTML = `
+  <header class="hero">
+    <h1 class="disp">${esc(last.player_name)}</h1>
+    <span class="meta">${esc(last.nationality ?? "")} · ${esc(last.primary_position ?? last.position ?? "")}
+      ${last.birth_year ? "· b."+last.birth_year : ""} · ${esc(last.team)} (${esc(last.season)})</span>
+    ${flags.join(" ")}
+  </header>
+  <div class="tiles nums">
+    <div class="tile"><div class="k">Latest value</div>
+      <div class="v">${eur(latestVal?.market_value_in_eur)}</div>
+      <div class="s">${latestVal ? "as of "+esc(latestVal.value_date ?? latestVal.season) : "no match"}</div></div>
+    <div class="tile"><div class="k">Peak value</div>
+      <div class="v">${eur(peakVal || null)}</div><div class="s">career high</div></div>
+    <div class="tile"><div class="k">Goals</div>
+      <div class="v">${sum("goals")}</div><div class="s">${sum("assists")} assists</div></div>
+    <div class="tile"><div class="k">Minutes</div>
+      <div class="v">${sum("minutes").toLocaleString("en")}</div>
+      <div class="s">${sum("matches_played")} matches · ${rows.length} seasons</div></div>
+  </div>
+  <section class="chart">
+    <h2><span class="swatch" style="background:var(--amber)"></span>Market value by season
+      <span style="color:var(--muted);letter-spacing:0;text-transform:none">· dashed = transfer · dotted = club change</span></h2>
+    <div class="chartbox">${valueChart(rows, moves)}</div>
+  </section>
+  <section class="chart">
+    <h2><span class="swatch" style="background:var(--green)"></span>Goals + assists
+      <span class="swatch" style="background:var(--blue)"></span>Minutes
+      <span class="swatch" style="background:var(--chalk-y)"></span>G+A per 90
+      <span style="color:var(--muted);letter-spacing:0;text-transform:none">· lines show trend — hover for values</span></h2>
+    <div class="chartbox">${gaChart(rows)}</div>
+  </section>
+  ${moves.length ? `
+  <div class="season-log">
+    <table class="nums">
+      <caption>Transfers <span style="letter-spacing:0;text-transform:none">(source coverage is partial — big historic moves can be missing)</span></caption>
+      <thead><tr><th>Date</th><th>From</th><th>To</th><th>Fee</th><th>Value then</th></tr></thead>
+      <tbody>
+      ${moves.slice().reverse().map(t=>`
+        <tr>
+          <td>${esc(t.transfer_date)}</td>
+          <td>${esc(t.from_club_name ?? "—")}</td>
+          <td>${esc(t.to_club_name ?? "—")}</td>
+          <td>${t.transfer_fee ? eur(t.transfer_fee) : '<span class="dim">free / undisclosed</span>'}</td>
+          <td>${eur(t.market_value_in_eur)}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+  </div>` : ""}
+  <div class="season-log">
+    <table class="nums">
+      <caption>Season log</caption>
+      <thead><tr><th>Season</th><th>League</th><th>Team</th><th>Min</th>
+        <th>G</th><th>A</th><th>G+A /90</th><th>Value</th></tr></thead>
+      <tbody>
+      ${rows.slice().reverse().map(r=>`
+        <tr>
+          <td>${esc(r.season)}</td>
+          <td class="dim">${esc(r.league.split("-")[0])}</td>
+          <td>${esc(r.team)}</td>
+          <td>${r.minutes ?? "—"}</td>
+          <td>${r.goals ?? "—"}</td>
+          <td>${r.assists ?? "—"}</td>
+          <td>${r.goals_assists_per90 != null ? r.goals_assists_per90.toFixed(2)
+               : '<span class="dim" title="under 450 minutes — rate not shown">—</span>'}</td>
+          <td>${eur(r.market_value_in_eur)}${r.value_is_stale
+               ? ' <span class="warn" title="valuation more than a year old at season end">⚠</span>' : ""}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+  </div>`;
+  wireTooltips(rows);
+}
+
+/* ---------- charts (shared x band scale) ---------- */
+const W=720, PAD_L=52, PAD_R=14;
+const bandX = (rows,i) => PAD_L + (W-PAD_L-PAD_R) * (i + .5) / rows.length;
+
+function valueChart(rows, moves = []){
+  const H=210, PT=14, PB=26;
+  const seasonIdx = Object.fromEntries(rows.map((r,i)=>[r.season,i]));
+  const recorded = new Set(moves.map(t=>seasonIdx[moveSeason(t.transfer_date)])
+                                .filter(i=>i!=null));
+  const vlines = moves.map(t=>{
+    const i = seasonIdx[moveSeason(t.transfer_date)];
+    if(i==null) return "";
+    return `<line x1="${bandX(rows,i)}" x2="${bandX(rows,i)}" y1="${PT}" y2="${H-PB}"
+      stroke="var(--line)" stroke-opacity=".35" stroke-dasharray="5 5">
+      <title>${t.transfer_date}: ${t.from_club_name ?? "?"} → ${t.to_club_name ?? "?"}${t.transfer_fee ? " · "+eur(t.transfer_fee) : ""}</title></line>`;
+  }).join("");
+
+  // fallback: transfer records are patchy upstream, but the season log
+  // itself shows the club changing — mark those moves too (dotted, no fee)
+  const bySeason = new Map();
+  rows.forEach((r,i)=>{
+    if(!bySeason.has(r.season)) bySeason.set(r.season, {i, teams:new Set()});
+    bySeason.get(r.season).teams.add(r.team);
+  });
+  const seasons = [...bySeason.entries()].sort((a,b)=>a[0]<b[0]?-1:1);
+  const synth = seasons.map(([s,cur],k)=>{
+    if(!k) return "";
+    const prev = seasons[k-1][1];
+    const stayed = [...cur.teams].some(t=>prev.teams.has(t));
+    if(stayed || recorded.has(cur.i)) return "";
+    return `<line x1="${bandX(rows,cur.i)}" x2="${bandX(rows,cur.i)}" y1="${PT}" y2="${H-PB}"
+      stroke="var(--line)" stroke-opacity=".25" stroke-dasharray="2 5">
+      <title>${s}: ${[...prev.teams].join("/")} → ${[...cur.teams].join("/")} (no transfer record)</title></line>`;
+  }).join("");
+  const vals = rows.map(r=>r.market_value_in_eur);
+  const max = Math.max(...vals.filter(v=>v!=null), 1);
+  const y = v => PT + (H-PT-PB) * (1 - v/max);
+  const pts = rows.map((r,i)=>vals[i]==null?null:[bandX(rows,i),y(vals[i])]);
+  const seg=[]; let run=[];
+  for(const p of pts){ if(p) run.push(p); else {if(run.length)seg.push(run); run=[];} }
+  if(run.length) seg.push(run);
+  const line = seg.map(s=>"M"+s.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")).join(" ");
+  const area = seg.map(s=>`M${s[0][0]} ${H-PB} L`+s.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")
+      +` L ${s[s.length-1][0]} ${H-PB} Z`).join(" ");
+  const gridVals=[max, max/2];
+  return `<svg viewBox="0 0 ${W} ${H}" id="vchart" aria-label="Market value by season">
+    ${gridVals.map(g=>`<line x1="${PAD_L}" x2="${W-PAD_R}" y1="${y(g)}" y2="${y(g)}"
+        stroke="var(--grid)"/><text x="${PAD_L-6}" y="${y(g)+4}" text-anchor="end"
+        font-size="11" fill="var(--axis)">${eur(g)}</text>`).join("")}
+    <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
+    ${vlines}${synth}
+    <path d="${area}" fill="var(--amber)" opacity=".14"/>
+    <path d="${line}" fill="none" stroke="var(--amber)" stroke-width="2"/>
+    ${pts.map((p,i)=>p?`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="var(--amber)"
+        stroke="var(--card)" stroke-width="2"/>`:"").join("")}
+    ${xAxis(rows,H,PB)}
+    <line id="vcross" y1="${PT}" y2="${H-PB}" stroke="var(--axis)" stroke-dasharray="3 3"
+        visibility="hidden"/>
+  </svg>`;
+}
+
+function gaChart(rows){
+  const H=170, PT=14, PB=26;
+  const ga = rows.map(r=>(r.goals||0)+(r.assists||0));
+  const max = Math.max(...ga,1);
+  const bw = Math.min(26,(W-PAD_L-PAD_R)/rows.length-2);
+  const bars = rows.map((r,i)=>{
+    const h = (H-PT-PB)*ga[i]/max, x = bandX(rows,i)-bw/2, yy = H-PB-h;
+    return `<rect data-i="${i}" x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}"
+        height="${Math.max(h,1).toFixed(1)}" rx="3" fill="var(--green)"/>`}).join("");
+  const top = ga.indexOf(Math.max(...ga));
+
+  // overlay trend lines: shape-fitted to panel height (axis stays G+A counts;
+  // raw minutes would flatten the bars), true values live in the tooltip
+  const overlay = (vals, color) => {
+    const vmax = Math.max(...vals.filter(v=>v!=null), 1e-9);
+    const pts = vals.map((v,i)=>v==null?null:
+      [bandX(rows,i), H-PB-(H-PT-PB)*.92*(v/vmax)]);
+    const seg=[]; let run=[];
+    for(const p of pts){ if(p) run.push(p); else {if(run.length>1)seg.push(run); run=[];} }
+    if(run.length>1) seg.push(run);
+    return seg.map(s=>`<path fill="none" stroke="${color}" stroke-width="2"
+      d="M${s.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")}"/>`).join("");
+  };
+  const minLine = overlay(rows.map(r=>r.minutes), "var(--blue)");
+  const p90Line = overlay(rows.map(r=>r.goals_assists_per90), "var(--chalk-y)");
+
+  return `<svg viewBox="0 0 ${W} ${H}" id="gchart" aria-label="Goals plus assists by season, with minutes and per-90 trend lines">
+    <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
+    <text x="${PAD_L-6}" y="${PT+8}" text-anchor="end" font-size="11" fill="var(--axis)">${max}</text>
+    ${bars}
+    ${minLine}${p90Line}
+    <text x="${bandX(rows,top)}" y="${Math.max(H-PB-(H-PT-PB)*ga[top]/max-6, 11)}"
+        text-anchor="middle" font-size="11" fill="var(--line)">${ga[top]}</text>
+    ${xAxis(rows,H,PB)}
+  </svg>`;
+}
+
+function xAxis(rows,H,PB){
+  const step = Math.ceil(rows.length/9);
+  return rows.map((r,i)=> i%step ? "" :
+    `<text x="${bandX(rows,i)}" y="${H-PB+16}" text-anchor="middle" font-size="11"
+      fill="var(--axis)">'${r.season.slice(2)}</text>`).join("");
+}
+
+/* ---------- hover layer ---------- */
+function wireTooltips(rows){
+  const tip = document.getElementById("tip");
+  const show = (e,html) => { tip.innerHTML = html; tip.style.display = "block";
+    tip.style.left = Math.min(e.clientX+14, innerWidth-190)+"px";
+    tip.style.top = (e.clientY+14)+"px"; };
+  const hide = () => tip.style.display = "none";
+
+  const v = document.getElementById("vchart"), cross = document.getElementById("vcross");
+  const idxFromEvent = (svg,e) => {
+    const r = svg.getBoundingClientRect();
+    const x = (e.clientX-r.left)/r.width*W;
+    return Math.max(0, Math.min(rows.length-1,
+      Math.floor((x-PAD_L)/(W-PAD_L-PAD_R)*rows.length)));
+  };
+  v.addEventListener("mousemove", e => {
+    const i = idxFromEvent(v,e), r = rows[i];
+    cross.setAttribute("x1",bandX(rows,i)); cross.setAttribute("x2",bandX(rows,i));
+    cross.setAttribute("visibility","visible");
+    show(e, `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
+      ${eur(r.market_value_in_eur)}${r.value_is_stale?" ⚠":""}`);
+  });
+  v.addEventListener("mouseleave", () => { hide(); cross.setAttribute("visibility","hidden"); });
+
+  const g = document.getElementById("gchart");
+  g.addEventListener("mousemove", e => {
+    const i = idxFromEvent(g,e), r = rows[i];
+    show(e, `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
+      ${(r.goals||0)} goals · ${(r.assists||0)} assists<br>
+      ${r.minutes||0} min · ${r.goals_assists_per90 != null
+        ? r.goals_assists_per90.toFixed(2)+" G+A/90" : "rate n/a (<450 min)"}`);
+  });
+  g.addEventListener("mouseleave", hide);
+}
+</script>
+</body>
+</html>

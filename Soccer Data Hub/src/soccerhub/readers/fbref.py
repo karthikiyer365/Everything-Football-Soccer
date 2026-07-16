@@ -41,11 +41,26 @@ _patch_league_config()
 import soccerdata as sd  # noqa: E402  — config file must exist before this import
 
 
+def _season_to_code(season: str) -> str:
+    """Start year -> soccerdata's unambiguous 4-digit code: '2021' -> '2122'.
+
+    Passing '2021' raw makes soccerdata parse it as the 20-21 season (it even
+    warns), which silently duplicated 2020 under the 2021 label.
+    """
+    y = int(season)
+    return f"{y % 100:02d}{(y + 1) % 100:02d}"
+
+
 def fetch_fbref_season(league: str, season: str, force: bool = False) -> Manifest:
-    """Player season stats for one league-season from FBref."""
+    """Player season stats for one league-season from FBref.
+
+    ``season`` is the canonical start year ('2021' = 2021-22 season).
+    """
 
     def produce():
-        return sd.FBref(leagues=league, seasons=season).read_player_season_stats()
+        return sd.FBref(
+            leagues=league, seasons=_season_to_code(season)
+        ).read_player_season_stats()
 
     return cached_fetch(
         "fbref", "player_season", {"league": league, "season": season}, produce, force
