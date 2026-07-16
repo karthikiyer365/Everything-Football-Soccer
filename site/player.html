@@ -233,7 +233,7 @@ function render(rows, moves = []){
   </div>
   <section class="chart">
     <h2><span class="swatch" style="background:var(--amber)"></span>Market value by season
-      ${moves.length ? '<span style="color:var(--muted);letter-spacing:0;text-transform:none">· dashed line = transfer</span>' : ""}</h2>
+      <span style="color:var(--muted);letter-spacing:0;text-transform:none">· dashed = transfer · dotted = club change</span></h2>
     <div class="chartbox">${valueChart(rows, moves)}</div>
   </section>
   <section class="chart">
@@ -289,12 +289,32 @@ const bandX = (rows,i) => PAD_L + (W-PAD_L-PAD_R) * (i + .5) / rows.length;
 function valueChart(rows, moves = []){
   const H=210, PT=14, PB=26;
   const seasonIdx = Object.fromEntries(rows.map((r,i)=>[r.season,i]));
+  const recorded = new Set(moves.map(t=>seasonIdx[moveSeason(t.transfer_date)])
+                                .filter(i=>i!=null));
   const vlines = moves.map(t=>{
     const i = seasonIdx[moveSeason(t.transfer_date)];
     if(i==null) return "";
     return `<line x1="${bandX(rows,i)}" x2="${bandX(rows,i)}" y1="${PT}" y2="${H-PB}"
       stroke="var(--line)" stroke-opacity=".35" stroke-dasharray="5 5">
       <title>${t.transfer_date}: ${t.from_club_name ?? "?"} → ${t.to_club_name ?? "?"}${t.transfer_fee ? " · "+eur(t.transfer_fee) : ""}</title></line>`;
+  }).join("");
+
+  // fallback: transfer records are patchy upstream, but the season log
+  // itself shows the club changing — mark those moves too (dotted, no fee)
+  const bySeason = new Map();
+  rows.forEach((r,i)=>{
+    if(!bySeason.has(r.season)) bySeason.set(r.season, {i, teams:new Set()});
+    bySeason.get(r.season).teams.add(r.team);
+  });
+  const seasons = [...bySeason.entries()].sort((a,b)=>a[0]<b[0]?-1:1);
+  const synth = seasons.map(([s,cur],k)=>{
+    if(!k) return "";
+    const prev = seasons[k-1][1];
+    const stayed = [...cur.teams].some(t=>prev.teams.has(t));
+    if(stayed || recorded.has(cur.i)) return "";
+    return `<line x1="${bandX(rows,cur.i)}" x2="${bandX(rows,cur.i)}" y1="${PT}" y2="${H-PB}"
+      stroke="var(--line)" stroke-opacity=".25" stroke-dasharray="2 5">
+      <title>${s}: ${[...prev.teams].join("/")} → ${[...cur.teams].join("/")} (no transfer record)</title></line>`;
   }).join("");
   const vals = rows.map(r=>r.market_value_in_eur);
   const max = Math.max(...vals.filter(v=>v!=null), 1);
@@ -312,7 +332,7 @@ function valueChart(rows, moves = []){
         stroke="var(--grid)"/><text x="${PAD_L-6}" y="${y(g)+4}" text-anchor="end"
         font-size="11" fill="var(--axis)">${eur(g)}</text>`).join("")}
     <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
-    ${vlines}
+    ${vlines}${synth}
     <path d="${area}" fill="var(--amber)" opacity=".14"/>
     <path d="${line}" fill="none" stroke="var(--amber)" stroke-width="2"/>
     ${pts.map((p,i)=>p?`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="var(--amber)"
