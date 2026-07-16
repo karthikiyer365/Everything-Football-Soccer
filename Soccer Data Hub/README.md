@@ -26,7 +26,8 @@ Cache directory: `SOCCERHUB_CACHE` env var, default `./data`.
     python -m soccerhub.mcp_server
 
 Tools: `fbref_season`, `statsbomb_events`, `transfermarkt_values` — each returns
-a manifest dict.
+a manifest dict — plus `hub_table` to query the Supabase source of truth
+(player_season, transfers, player_xref) with league/season/tm_id filters.
 
 ## Readers (v1 tracer bullet)
 
