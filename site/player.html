@@ -10,7 +10,7 @@
   :root{
     --grass:#122b1a; --grass-lt:#16321f; --card:#0a1a0e;
     --line:#f2f5ef; --muted:#9fb69c; --tag:#8fae8b; --border:rgba(242,245,239,.22);
-    --amber:#ffb43a; --green:#8fd18a; --chalk-y:#e8d47a;
+    --amber:#ffb43a; --green:#8fd18a; --chalk-y:#e8d47a; --blue:#5aa9f0;
     --grid:rgba(242,245,239,.10); --axis:rgba(242,245,239,.35);
   }
   *{box-sizing:border-box}
@@ -237,7 +237,10 @@ function render(rows, moves = []){
     <div class="chartbox">${valueChart(rows, moves)}</div>
   </section>
   <section class="chart">
-    <h2><span class="swatch" style="background:var(--green)"></span>Goals + assists by season</h2>
+    <h2><span class="swatch" style="background:var(--green)"></span>Goals + assists
+      <span class="swatch" style="background:var(--blue)"></span>Minutes
+      <span class="swatch" style="background:var(--chalk-y)"></span>G+A per 90
+      <span style="color:var(--muted);letter-spacing:0;text-transform:none">· lines show trend — hover for values</span></h2>
     <div class="chartbox">${gaChart(rows)}</div>
   </section>
   ${moves.length ? `
@@ -344,7 +347,7 @@ function valueChart(rows, moves = []){
 }
 
 function gaChart(rows){
-  const H=150, PT=12, PB=26;
+  const H=170, PT=14, PB=26;
   const ga = rows.map(r=>(r.goals||0)+(r.assists||0));
   const max = Math.max(...ga,1);
   const bw = Math.min(26,(W-PAD_L-PAD_R)/rows.length-2);
@@ -353,10 +356,27 @@ function gaChart(rows){
     return `<rect data-i="${i}" x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}"
         height="${Math.max(h,1).toFixed(1)}" rx="3" fill="var(--green)"/>`}).join("");
   const top = ga.indexOf(Math.max(...ga));
-  return `<svg viewBox="0 0 ${W} ${H}" id="gchart" aria-label="Goals plus assists by season">
+
+  // overlay trend lines: shape-fitted to panel height (axis stays G+A counts;
+  // raw minutes would flatten the bars), true values live in the tooltip
+  const overlay = (vals, color) => {
+    const vmax = Math.max(...vals.filter(v=>v!=null), 1e-9);
+    const pts = vals.map((v,i)=>v==null?null:
+      [bandX(rows,i), H-PB-(H-PT-PB)*.92*(v/vmax)]);
+    const seg=[]; let run=[];
+    for(const p of pts){ if(p) run.push(p); else {if(run.length>1)seg.push(run); run=[];} }
+    if(run.length>1) seg.push(run);
+    return seg.map(s=>`<path fill="none" stroke="${color}" stroke-width="2"
+      d="M${s.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")}"/>`).join("");
+  };
+  const minLine = overlay(rows.map(r=>r.minutes), "var(--blue)");
+  const p90Line = overlay(rows.map(r=>r.goals_assists_per90), "var(--chalk-y)");
+
+  return `<svg viewBox="0 0 ${W} ${H}" id="gchart" aria-label="Goals plus assists by season, with minutes and per-90 trend lines">
     <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
     <text x="${PAD_L-6}" y="${PT+8}" text-anchor="end" font-size="11" fill="var(--axis)">${max}</text>
     ${bars}
+    ${minLine}${p90Line}
     <text x="${bandX(rows,top)}" y="${Math.max(H-PB-(H-PT-PB)*ga[top]/max-6, 11)}"
         text-anchor="middle" font-size="11" fill="var(--line)">${ga[top]}</text>
     ${xAxis(rows,H,PB)}
@@ -398,7 +418,9 @@ function wireTooltips(rows){
   g.addEventListener("mousemove", e => {
     const i = idxFromEvent(g,e), r = rows[i];
     show(e, `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
-      ${(r.goals||0)} goals · ${(r.assists||0)} assists · ${r.minutes||0} min`);
+      ${(r.goals||0)} goals · ${(r.assists||0)} assists<br>
+      ${r.minutes||0} min · ${r.goals_assists_per90 != null
+        ? r.goals_assists_per90.toFixed(2)+" G+A/90" : "rate n/a (<450 min)"}`);
   });
   g.addEventListener("mouseleave", hide);
 }
