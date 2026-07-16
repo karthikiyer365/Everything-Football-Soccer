@@ -1,6 +1,6 @@
 # Topical Map
 
-Generated 2026-07-16 at `99fb72e` · `⟶` = dependency edge · `▓ planned ▓` = claimed in
+Generated 2026-07-16 at `d843bb9` · `⟶` = dependency edge · `▓ planned ▓` = claimed in
 docs/UI but absent from code · regenerate stale sections, don't patch prose.
 
 ---
@@ -36,8 +36,8 @@ docs/UI but absent from code · regenerate stale sections, don't patch prose.
 - Where: `site/index.html` (167 LOC, static — no JS beyond SMIL ball animation).
 - Docs: none dedicated; deployed by `.github/workflows/deploy-pages.yml`.
 - Edges: ⟶ A1 (only live link: `href="player.html"` ×2).
-- Drift: footer claims data "refreshed twice weekly" — true only for EPL player stats
-  (see C2/C3); transfers and the other four leagues have no scheduled refresh.
+- Note: footer's "refreshed twice weekly" holds — cron matrixes all 5 leagues +
+  transfers (see C2/C3).
 
 ---
 
@@ -63,7 +63,7 @@ docs/UI but absent from code · regenerate stale sections, don't patch prose.
 **[▓ A3] Market screens — Transfer Market, League Inflation, Age Curves**
 - What: fees/moves explorer, league value growth, positional age arcs. Cards only.
 - Where: `site/index.html:126-140`.
-- Edges: would read `transfers` + `player_season`; blocked on C3 (transfers refresh gap).
+- Edges: would read `transfers` + `player_season` (both cron-refreshed, see C2/C3).
 
 ---
 
@@ -88,12 +88,13 @@ docs/UI but absent from code · regenerate stale sections, don't patch prose.
 ---
 
 **[A6] MCP server (agent surface)**
-- What: FastMCP wrapper exposing three reader tools — `fbref_season`,
-  `statsbomb_events`, `transfermarkt_values` — each returns a manifest dict.
-- Where: `Soccer Data Hub/src/soccerhub/mcp_server.py` (31 LOC).
+- What: FastMCP wrapper — three reader tools (`fbref_season`, `statsbomb_events`,
+  `transfermarkt_values`, each returns a manifest dict) plus `hub_table`
+  (league/season/tm_id-filtered reads of the Supabase source of truth,
+  truncated at `max_rows`).
+- Where: `Soccer Data Hub/src/soccerhub/mcp_server.py`.
 - Docs: `Soccer Data Hub/README.md` "Use (MCP server)".
-- Edges: ⟶ B1 readers only. Does NOT expose `read_hub` — agents can't reach the
-  Supabase source of truth through MCP yet.
+- Edges: ⟶ B1 readers, ⟶ B5 `read_hub`.
 
 ---
 
@@ -150,10 +151,8 @@ docs/UI but absent from code · regenerate stale sections, don't patch prose.
   "2021"→"2122"), `transfermarkt.py` (93 — players/transfers/values from
   transfermarkt-datasets), `statsbomb.py` (15 — events via kloppy).
 - Docs: hub README "Use (package)".
-- Edges: ⟶ B0; ⟵ B2/B3 (`refetch` param forwards as `force`), ⟵ A6, ⟵ B11.
-- Drift: `fetch_transfermarkt_transfers` (transfermarkt.py:55) has **no downstream
-  pipeline** — `grep transfers pipelines/` = 0 hits. The `transfers` table was loaded
-  by a one-off script since deleted. See C3.
+- Edges: ⟶ B0; ⟵ B2/B3 (`refetch` param forwards as `force`), ⟵ B6
+  (`push_transfers`), ⟵ A6.
 
 ---
 
@@ -197,12 +196,13 @@ docs/UI but absent from code · regenerate stale sections, don't patch prose.
 
 ---
 
-**[B6] run_season orchestrator**
-- What: the cron preset: xref (refetch) → push_xref → player_season (refetch) → upsert.
-  `force=True` means re-download sources, not just re-merge.
-- Where: `soccerhub/pipelines/__init__.py` (46 LOC) — `run_season()`, `push_xref()`,
-  `XREF_CONFLICT_KEY`.
-- Edges: ⟶ B2, B3, B4; ⟵ B8 cron.
+**[B6] Pipeline presets (cron entry points)**
+- What: `run_season()` — xref (refetch) → push_xref → player_season (refetch) →
+  upsert; `force=True` means re-download sources, not just re-merge. Plus
+  `push_transfers()` — transfers reader → upsert on `tm_id,transfer_date`.
+- Where: `soccerhub/pipelines/__init__.py` — `run_season()`, `push_xref()`,
+  `push_transfers()`, `XREF_CONFLICT_KEY`, `TRANSFERS_CONFLICT_KEY`.
+- Edges: ⟶ B1, B2, B3, B4; ⟵ B8 cron.
 
 ---
 
@@ -215,19 +215,20 @@ docs/UI but absent from code · regenerate stale sections, don't patch prose.
 ---
 
 **[B8] CI / automation**
-- What: two workflows. `run-season.yml`: cron Mon+Thu 06:00 UTC → `run_season(LEAGUE,
-  SEASON, force=True)`; scheduled runs have no inputs so env defaults apply —
-  **EPL 2025 only**. `deploy-pages.yml`: push to main touching `site/**` → GitHub Pages.
+- What: two workflows. `run-season.yml`: cron Mon+Thu 06:00 UTC — matrix over all 5
+  leagues (`max-parallel: 1`, FBref IP-block protection) → `run_season(league,
+  SEASON, force=True)`, plus a `transfers` job → `push_transfers(force=True)`;
+  `workflow_dispatch` takes a season override. `deploy-pages.yml`: push to main
+  touching `site/**` → GitHub Pages.
 - Where: `.github/workflows/run-season.yml`, `.github/workflows/deploy-pages.yml`.
-- Drift: ESP/GER/ITA/FRA are backfilled but never auto-refreshed; current-season rows
-  for those leagues go stale between manual `workflow_dispatch` runs.
+- Note: `SEASON` default is hardcoded "2025" — bump each August.
 
 ---
 
 **[B9] Tests**
-- What: pytest, 13 files / 817 LOC, all monkeypatch-based (no network). Cover season
+- What: pytest, 13 files / 38 tests, all monkeypatch-based (no network). Cover season
   codes, xref ladder, disambiguation, clean() rules, upsert chunking, read_hub
-  pagination, run_season refetch propagation, public exports.
+  pagination, run_season refetch propagation, push_transfers, MCP tools, exports.
 - Where: `Soccer Data Hub/tests/test_*.py`.
 - Edges: ⟶ every B0–B6 unit.
 
@@ -242,21 +243,11 @@ docs/UI but absent from code · regenerate stale sections, don't patch prose.
 
 ---
 
-**[B11] preview_app (dev toy)**
-- What: self-described "throwaway local preview" — stdlib HTTP server rendering reader
-  output as HTML tables on :8765. Superseded by site/ for anything user-facing.
-- Where: `Soccer Data Hub/preview_app.py` (135 LOC, outside `src/`).
-- Edges: ⟶ B1 readers only.
-
----
-
-**[B12] Legacy: Player Performance Analysis**
+**[B11] Legacy: Player Performance Analysis**
 - What: pre-soccerhub standalone project (FIFA CSVs, Dash). No imports in or out of
   the soccerhub package; frozen since 2024.
 - Where: `Player Performance Analysis/` (1,015 LOC across 3 scripts).
-- Docs: `docs/product/football-scout-machine.md`, root `README.md`.
-- Drift: root `README.md` describes ONLY this project — Soccer Data Hub, the site and
-  the workflows are absent from it entirely.
+- Docs: `docs/product/football-scout-machine.md`, root `README.md` §3.
 
 ---
 
@@ -307,16 +298,17 @@ on key changes).
 
 ---
 
-**C3 · Transfers load — ⚠ manual gap**
+**C3 · Transfers refresh (write path)**
 
 ```
-fetch_transfermarkt_transfers()        readers/transfermarkt.py:55
-  └──> (rename player_id→tm_id, drop future-dated placeholders, dedup)
-         └──> ▓ no pipeline ▓  one-off script (deleted) pushed to `transfers` via
-              upsert_df; run_season never touches it → table is a snapshot, not a feed
+run-season.yml `transfers` job (same cron)
+  └──> push_transfers(force=True)              pipelines/__init__.py
+         └──> fetch_transfermarkt_transfers()  readers/transfermarkt.py:55
+                (rename player_id→tm_id, drop future-dated placeholders, dedup)
+                └──> upsert_df(df, "transfers", "tm_id,transfer_date")
 ```
-Fix when needed: one `push_transfers()` preset in `pipelines/__init__.py` + a line in
-the cron. Blocks A3 (Transfer Market screen) from being trustworthy.
+Upstream coverage is still partial (big historic moves can be missing) — the player
+page's synthetic club-change markers stay necessary.
 
 ---
 
@@ -346,8 +338,8 @@ impute ──> Male_Players.csv / Female_Players.csv (local) ──> player_stat
 |---|---|---|
 | A0 Landing | B10, B8 (pages) | card stats hard-coded (49,692 / 35,123) — restate after big loads |
 | A1 Player Dashboard | B10 ⟶ B7 tables ⟵ C2 | JS `hub()` vs Python `read_hub()` — same PostgREST semantics, changed separately |
-| A1 value markers | C2 + C3 | synthetic markers assume `transfers` may be stale — stays true until C3 is wired |
-| ▓ A2/A3 screens | B5 or B10, C3 | A3 needs transfers refresh (C3) first |
+| A1 value markers | C2 + C3 | upstream transfer coverage partial — synthetic markers stay necessary |
+| ▓ A2/A3 screens | B5 or B10, C2/C3 | both tables cron-refreshed; build when ready |
 | ▓ A4 screens | B1 statsbomb (unused) | no schedule/event ingestion exists yet |
-| A6 MCP server | B1 only | does not expose read_hub — agents bypass source of truth |
+| A6 MCP server | B1 + B5 | hub_table truncates at max_rows — filter before trusting counts |
 | A5 legacy | nothing shared | safe to archive; only root README references it |
