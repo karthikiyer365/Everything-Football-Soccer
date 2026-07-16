@@ -2,21 +2,26 @@ def test_run_season_chains_and_pushes(monkeypatch):
     import soccerhub.pipelines as pl
 
     order = []
+    refetches = []
     fake_manifest = object()
-    monkeypatch.setattr(pl, "build_player_xref",
-                        lambda l, s, force=False: order.append("xref"))
+    monkeypatch.setattr(
+        pl, "build_player_xref",
+        lambda l, s, force=False, refetch=False:
+            (order.append("xref"), refetches.append(refetch))[0])
     monkeypatch.setattr(pl, "push_xref",
                         lambda m, l, s: order.append("push:xref"))
     monkeypatch.setattr(
         pl, "build_player_season",
-        lambda l, s, force=False: (order.append("merge"), fake_manifest)[1],
+        lambda l, s, force=False, refetch=False:
+            (order.append("merge"), refetches.append(refetch), fake_manifest)[2],
     )
     monkeypatch.setattr(pl, "push_to_supabase",
                         lambda m, table: order.append(f"push:{table}"))
 
-    out = pl.run_season("ENG-Premier League", "2023")
+    out = pl.run_season("ENG-Premier League", "2023", force=True)
     assert order == ["xref", "push:xref", "merge", "push:player_season"]
     assert out is fake_manifest
+    assert refetches == [True, True]  # cron force must reach the leaf readers
 
 
 def test_read_hub_paginates_and_filters(monkeypatch):

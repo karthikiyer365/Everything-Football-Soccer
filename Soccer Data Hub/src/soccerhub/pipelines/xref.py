@@ -74,11 +74,19 @@ def _score(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
-def build_player_xref(league: str, season: str, force: bool = False) -> Manifest:
-    """One row per FBref (player, team) in a league-season -> tm_id + method."""
+def build_player_xref(
+    league: str, season: str, force: bool = False, refetch: bool = False
+) -> Manifest:
+    """One row per FBref (player, team) in a league-season -> tm_id + method.
+
+    force rebuilds this derived table; refetch additionally re-downloads the
+    source data (fbref pages, TM registry) instead of trusting reader caches.
+    """
 
     def produce():
-        fbref = pd.read_parquet(fetch_fbref_season(league, season).path).reset_index()
+        fbref = pd.read_parquet(
+            fetch_fbref_season(league, season, force=refetch).path
+        ).reset_index()
         if isinstance(fbref.columns, pd.MultiIndex):
             # real fbref frames have ('Performance','Gls')-style columns;
             # we only need the index-derived flat ones (player/team/born)
@@ -99,7 +107,7 @@ def build_player_xref(league: str, season: str, force: bool = False) -> Manifest
 
         # full registry, not current-league squads: historical seasons are
         # full of players who since retired or transferred out
-        tm = pd.read_parquet(fetch_transfermarkt_players(None).path)
+        tm = pd.read_parquet(fetch_transfermarkt_players(None, force=refetch).path)
         tm["norm"] = tm["name"].map(normalize)
         exact_by_norm = tm.set_index("norm")["player_id"].to_dict()
         tm_year = pd.to_datetime(tm["date_of_birth"], errors="coerce").dt.year
