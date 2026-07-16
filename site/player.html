@@ -177,17 +177,29 @@ async function load(){
   const params = {select: "*", order: "season"};
   if(u.has("tm")) params.tm_id = `eq.${u.get("tm")}`;
   else params.player_name = `eq.${u.get("name")}`;
-  let rows;
-  try{ rows = await hub("player_season", params); }
+  let rows, moves = [];
+  try{
+    rows = await hub("player_season", params);
+    if(u.has("tm"))
+      moves = await hub("transfers",
+        {select:"transfer_date,from_club_name,to_club_name,transfer_fee,market_value_in_eur",
+         tm_id:`eq.${u.get("tm")}`, order:"transfer_date"});
+  }
   catch(e){ main.innerHTML =
     `<div class="empty">Could not reach the database (${esc(e.message)}). Try again.</div>`;
     return; }
   if(!rows.length){ main.innerHTML =
     `<div class="empty">No seasons found for this player.</div>`; return; }
-  render(rows);
+  render(rows, moves);
 }
 
-function render(rows){
+/* transfer date -> season start-year label ('2022-07-01' -> '2022') */
+const moveSeason = d => {
+  const [y,m] = d.split("-").map(Number);
+  return String(m >= 7 ? y : y-1);
+};
+
+function render(rows, moves = []){
   const last = rows[rows.length-1];
   const sum = k => rows.reduce((a,r)=>a+(r[k]||0),0);
   const latestVal = [...rows].reverse().find(r=>r.market_value_in_eur!=null);
@@ -220,13 +232,31 @@ function render(rows){
       <div class="s">${sum("matches_played")} matches · ${rows.length} seasons</div></div>
   </div>
   <section class="chart">
-    <h2><span class="swatch" style="background:var(--amber)"></span>Market value by season</h2>
-    <div class="chartbox">${valueChart(rows)}</div>
+    <h2><span class="swatch" style="background:var(--amber)"></span>Market value by season
+      ${moves.length ? '<span style="color:var(--muted);letter-spacing:0;text-transform:none">· dashed line = transfer</span>' : ""}</h2>
+    <div class="chartbox">${valueChart(rows, moves)}</div>
   </section>
   <section class="chart">
     <h2><span class="swatch" style="background:var(--green)"></span>Goals + assists by season</h2>
     <div class="chartbox">${gaChart(rows)}</div>
   </section>
+  ${moves.length ? `
+  <div class="season-log">
+    <table class="nums">
+      <caption>Transfers <span style="letter-spacing:0;text-transform:none">(source coverage is partial — big historic moves can be missing)</span></caption>
+      <thead><tr><th>Date</th><th>From</th><th>To</th><th>Fee</th><th>Value then</th></tr></thead>
+      <tbody>
+      ${moves.slice().reverse().map(t=>`
+        <tr>
+          <td>${esc(t.transfer_date)}</td>
+          <td>${esc(t.from_club_name ?? "—")}</td>
+          <td>${esc(t.to_club_name ?? "—")}</td>
+          <td>${t.transfer_fee ? eur(t.transfer_fee) : '<span class="dim">free / undisclosed</span>'}</td>
+          <td>${eur(t.market_value_in_eur)}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+  </div>` : ""}
   <div class="season-log">
     <table class="nums">
       <caption>Season log</caption>
@@ -256,8 +286,16 @@ function render(rows){
 const W=720, PAD_L=52, PAD_R=14;
 const bandX = (rows,i) => PAD_L + (W-PAD_L-PAD_R) * (i + .5) / rows.length;
 
-function valueChart(rows){
+function valueChart(rows, moves = []){
   const H=210, PT=14, PB=26;
+  const seasonIdx = Object.fromEntries(rows.map((r,i)=>[r.season,i]));
+  const vlines = moves.map(t=>{
+    const i = seasonIdx[moveSeason(t.transfer_date)];
+    if(i==null) return "";
+    return `<line x1="${bandX(rows,i)}" x2="${bandX(rows,i)}" y1="${PT}" y2="${H-PB}"
+      stroke="var(--line)" stroke-opacity=".35" stroke-dasharray="5 5">
+      <title>${t.transfer_date}: ${t.from_club_name ?? "?"} → ${t.to_club_name ?? "?"}${t.transfer_fee ? " · "+eur(t.transfer_fee) : ""}</title></line>`;
+  }).join("");
   const vals = rows.map(r=>r.market_value_in_eur);
   const max = Math.max(...vals.filter(v=>v!=null), 1);
   const y = v => PT + (H-PT-PB) * (1 - v/max);
@@ -274,6 +312,7 @@ function valueChart(rows){
         stroke="var(--grid)"/><text x="${PAD_L-6}" y="${y(g)+4}" text-anchor="end"
         font-size="11" fill="var(--axis)">${eur(g)}</text>`).join("")}
     <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
+    ${vlines}
     <path d="${area}" fill="var(--amber)" opacity=".14"/>
     <path d="${line}" fill="none" stroke="var(--amber)" stroke-width="2"/>
     ${pts.map((p,i)=>p?`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="var(--amber)"
