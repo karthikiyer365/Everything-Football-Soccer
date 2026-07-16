@@ -53,6 +53,9 @@ env/
 figures/
 output/
 
+# ── Website (hand-written, IS versioned) ──────────────────────────
+!site/**
+
 # ── Local working notes (not versioned) ───────────────────────────
 /SOCCER_DS_BACKLOG.md
 
