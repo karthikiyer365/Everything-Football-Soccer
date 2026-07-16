@@ -13,10 +13,14 @@ CONFLICT_KEY = "league,season,team,player_name"
 def push_to_supabase(
     manifest: Manifest, table: str, on_conflict: str = CONFLICT_KEY
 ) -> int:
+    return upsert_df(pd.read_parquet(manifest.path), table, on_conflict)
+
+
+def upsert_df(df: pd.DataFrame, table: str, on_conflict: str) -> int:
     client = create_client(
         os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"]
     )
-    df = pd.read_parquet(manifest.path)
+    df = df.copy()
     for col in df.columns:
         # pandas upcasts nullable ints to float ('25000000.0' breaks bigint
         # columns in postgres) — send whole-number floats back as ints
