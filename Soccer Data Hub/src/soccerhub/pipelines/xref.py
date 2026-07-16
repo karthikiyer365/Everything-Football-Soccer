@@ -15,14 +15,6 @@ MAPPING_URL = (
     "master/raw-data/fbref-tm-player-mapping/output/fbref_to_tm_mapping.csv"
 )
 
-LEAGUE_TO_TM = {
-    "ENG-Premier League": "GB1",
-    "ESP-La Liga": "ES1",
-    "GER-Bundesliga": "L1",
-    "ITA-Serie A": "IT1",
-    "FRA-Ligue 1": "FR1",
-}
-
 FUZZY_FLOOR = 0.85  # ponytail: single global threshold, tune per-league if noisy
 
 # Manual review verdicts: fbref_name -> tm_id (or None = force unmatched).
