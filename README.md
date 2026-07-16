@@ -1,20 +1,39 @@
 # Everything Football / Soccer
 
-A collection of football (soccer) data and analytics projects.
+Football (soccer) data and analytics projects. Full topology (product, developer,
+data flows): [`docs/TOPICAL_MAP.md`](docs/TOPICAL_MAP.md).
+
+```
+FBref · Transfermarkt · StatsBomb
+        │  soccerhub readers (fetch → parquet cache → manifest)
+        v
+  pipelines: xref (entity resolution) → player_season (merge + clean)
+        │  GitHub Actions cron, Mon + Thu
+        v
+  Supabase Postgres  ←  source of truth (RLS: anon read-only)
+        │
+        v
+  site/ dashboards (GitHub Pages)
+```
 
 ## Projects
 
-### 1. Player Performance Analysis
-FIFA player-scouting toolkit spanning 2015–2022 male and female datasets.
+### 1. Soccer Data Hub (`soccerhub`)
+Python package: unified fetch layer + pipelines for open football data. 18 seasons
+(2008–2025) of the Big-5 leagues — player season stats, market values, transfers —
+entity-resolved across FBref and Transfermarkt into Supabase.
+See [`Soccer Data Hub/README.md`](Soccer%20Data%20Hub/README.md).
 
-- **ETL pipeline** — fetches per-year FIFA datasets, selects 22 core attributes, explodes multi-position players into tidy per-position rows, and imputes missing values.
-- **Interactive Dash dashboard** (`localhost:8080`) — three tabs: filtered data download, outlier / normality inspection, and player-vs-player radar comparison.
-- **Statistical testing** — Shapiro, Kolmogorov–Smirnov and D'Agostino normality tests, Tukey-IQR outlier removal, and Box-Cox transforms.
-- **Exploratory analysis** — PCA, Pearson correlation heatmaps, KDE and pair plots, plus position and nationality distributions via matplotlib / seaborn / plotly.
-- **Stack** — pandas, NumPy, SciPy, statsmodels, scikit-learn, Dash and Plotly.
+### 2. Site (`site/`)
+Static dashboards on GitHub Pages reading Supabase directly (anon key, select-only).
+Live: pitch-themed landing + player dashboard (career values, G+A, transfers).
+Deployed by `.github/workflows/deploy-pages.yml` on push to main.
 
-> Note: the scripts read generated `Male_Players.csv` / `Female_Players.csv` from the working directory. Run `player_data_generate.py` from inside the project folder to (re)generate them before launching the dashboard.
+### 3. Player Performance Analysis (legacy, frozen)
+FIFA player-scouting toolkit, 2015–2022 datasets: ETL, Dash dashboard, statistical
+EDA. Standalone — shares no code with soccerhub.
+See [`docs/product/football-scout-machine.md`](docs/product/football-scout-machine.md).
 
 ---
 
-_Copyright © 2024 Karthik Sivaraman Iyer. All rights reserved._
+_Copyright © 2024–2026 Karthik Sivaraman Iyer. All rights reserved._

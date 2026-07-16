@@ -12,11 +12,25 @@ __all__ = [
     "build_player_xref",
     "build_player_season",
     "push_to_supabase",
+    "push_transfers",
     "read_hub",
     "run_season",
 ]
 
 XREF_CONFLICT_KEY = "league,season,team,fbref_name"
+TRANSFERS_CONFLICT_KEY = "tm_id,transfer_date"  # matches 0002 PK
+
+
+def push_transfers(force: bool = False) -> int:
+    """Transfers snapshot -> transfers table. Cron runs this so the table
+    stays a feed, not a one-off load."""
+    import pandas as pd
+
+    from soccerhub.pipelines.supa import upsert_df
+    from soccerhub.readers.transfermarkt import fetch_transfermarkt_transfers
+
+    m = fetch_transfermarkt_transfers(force=force)
+    return upsert_df(pd.read_parquet(m.path), "transfers", TRANSFERS_CONFLICT_KEY)
 
 
 def push_xref(manifest: Manifest, league: str, season: str) -> int:

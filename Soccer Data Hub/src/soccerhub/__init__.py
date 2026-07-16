@@ -13,6 +13,7 @@ from soccerhub.pipelines import (
     build_player_season,
     build_player_xref,
     push_to_supabase,
+    push_transfers,
     read_hub,
     run_season,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "build_player_xref",
     "build_player_season",
     "push_to_supabase",
+    "push_transfers",
     "read_hub",
     "run_season",
 ]

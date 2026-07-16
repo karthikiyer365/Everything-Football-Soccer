@@ -81,8 +81,41 @@ def test_push_xref_adds_key_columns(monkeypatch, tmp_path):
     assert captured["key"] == "league,season,team,fbref_name"
 
 
+def test_push_transfers_upserts_on_composite_key(monkeypatch, tmp_path):
+    import pandas as pd
+
+    import soccerhub.pipelines as pl
+    from soccerhub.manifest import Manifest
+
+    tdf = pd.DataFrame({"tm_id": [1], "transfer_date": ["2023-07-01"],
+                        "from_club": ["A"], "to_club": ["B"]})
+    p = tmp_path / "t.parquet"
+    tdf.to_parquet(p)
+    m = Manifest(path=str(p), source="transfermarkt", dataset="transfers",
+                 params={}, rows=1, cols=4, date_range=None, fetched_at="t")
+
+    forces = []
+    monkeypatch.setattr(
+        "soccerhub.readers.transfermarkt.fetch_transfermarkt_transfers",
+        lambda force=False: (forces.append(force), m)[1])
+
+    captured = {}
+
+    def fake_upsert(df, table, on_conflict):
+        captured["table"], captured["key"] = table, on_conflict
+        return len(df)
+
+    import soccerhub.pipelines.supa as sp
+    monkeypatch.setattr(sp, "upsert_df", fake_upsert)
+
+    assert pl.push_transfers(force=True) == 1
+    assert forces == [True]
+    assert captured["table"] == "transfers"
+    assert captured["key"] == "tm_id,transfer_date"
+
+
 def test_public_exports():
     import soccerhub
     for fn in ("build_player_xref", "build_player_season",
-               "push_to_supabase", "run_season"):
+               "push_to_supabase", "push_transfers", "run_season"):
         assert callable(getattr(soccerhub, fn))
