@@ -80,6 +80,14 @@
   .bar .fill{height:100%;border-radius:5px}
   .bar b{text-align:right}
   .bar .raw{color:var(--muted);font-weight:400;margin-right:8px}
+  .cardrow{display:grid;grid-template-columns:92px 1fr;gap:10px;align-items:center;
+       font-size:12px;margin:10px 0}
+  .cardrow label{letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+  .cardrow .dots{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
+  .cardrow .yc,.cardrow .rc{width:9px;height:12px;border-radius:2px;display:inline-block}
+  .cardrow .yc{background:#f5c542}
+  .cardrow .rc{background:#e0524a}
+  .cardrow .rate{color:var(--muted);margin-left:8px}
   .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:16px;
          border-top:1px solid rgba(242,245,239,.15);padding-top:14px;text-align:center}
   .facts label{display:block;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
@@ -244,8 +252,9 @@ async function load(){
     // independent fetches: losing the curve must not cost the card its percentiles
     const [pr, cr] = await Promise.allSettled([
       hub("player_season", {
-        select: "player_name,team,minutes,starts,matches_played,yellow_cards," +
-                "red_cards,nineties,non_penalty_goals_assists_per90,market_value_in_eur",
+        select: "player_name,team,minutes,starts,matches_played,nineties," +
+                "non_penalty_goals_assists_per90,market_value_in_eur," +
+                "tackles_interceptions_per90,save_pct,clean_sheet_pct,goals_against",
         league: `eq.${srow.league}`, season: `eq.${season}`,
         primary_position: `eq.${srow.primary_position}`, minutes: `gte.${MIN_MINUTES}`}),
       hub("age_curve", {select: "age,avg_value_eur",
@@ -270,34 +279,54 @@ function pctsOf(pool, key){
   const n = vals.length;
   return v => {
     if(v==null || n < 8) return null;   // tiny pools rank nothing meaningfully
+    // midrank ties: a whole pool tied at 100% start share must read 50, not 0
     let lo=0, hi=n;
     while(lo<hi){ const m=(lo+hi)>>1; if(vals[m]<v) lo=m+1; else hi=m; }
-    return Math.round(100*lo/Math.max(n-1,1));
+    let up=lo, hi2=n;
+    while(up<hi2){ const m=(up+hi2)>>1; if(vals[m]<=v) up=m+1; else hi2=m; }
+    const mid = lo + Math.max(up-lo-1, 0)/2;
+    return Math.round(100*mid/Math.max(n-1,1));
   };
 }
 const startShare = r => r.matches_played ? (r.starts||0)/r.matches_played : null;
-const cardsPer90 = r => r.nineties ? ((r.yellow_cards||0)+(r.red_cards||0))/r.nineties : null;
+const conceded90 = r => r.nineties && r.goals_against!=null ? r.goals_against/r.nineties : null;
 // league seasons: 34 games in the Bundesliga, 38 everywhere else in the big five
 const availability = r => Math.min(1, (r.minutes||0) /
   ((r.league?.startsWith("GER") ? 34 : 38) * 90));
 
+// position-appropriate output metric drives the rating, verdict and scatter
+const METRIC = {
+  FW: {key:"non_penalty_goals_assists_per90", label:"npG+A /90",
+       fmt:v=>v?.toFixed(2)},
+  MF: {key:"non_penalty_goals_assists_per90", label:"npG+A /90",
+       fmt:v=>v?.toFixed(2)},
+  DF: {key:"tackles_interceptions_per90", label:"Tkl+Int /90",
+       fmt:v=>v?.toFixed(2), since:2017,
+       note:"Tkl+Int/90 measures defensive volume, not quality — a dominant team's defender simply defends less."},
+  GK: {key:"save_pct", label:"Save %",
+       fmt:v=>v!=null ? v.toFixed(1)+"%" : null, since:2017,
+       note:"Save% ignores shot difficulty — PSxG arrives with a later phase."},
+};
+
 function cardModel(srow, peers){
-  const pool = peers.map(p=>({...p, start_share: startShare(p), cards90: cardsPer90(p)}));
-  const me = {...srow, start_share: startShare(srow), cards90: cardsPer90(srow)};
+  const metric = METRIC[srow.primary_position] ?? METRIC.FW;
+  const pool = peers.map(p=>({...p, start_share: startShare(p),
+    conceded90: conceded90(p)}));
+  const me = {...srow, start_share: startShare(srow), conceded90: conceded90(srow)};
   const pct = {};
-  for(const k of ["non_penalty_goals_assists_per90",
-                  "minutes","start_share","market_value_in_eur"])
+  for(const k of [metric.key, "minutes", "start_share", "market_value_in_eur",
+                  "clean_sheet_pct"])
     pct[k] = pctsOf(pool, k)(me[k]);
-  // fewer cards = better: invert so a full bar means clean
-  const c = pctsOf(pool, "cards90")(me.cards90);
-  pct.discipline = c==null ? null : 100 - c;
-  const out = pct.non_penalty_goals_assists_per90, val = pct.market_value_in_eur;
-  const attacker = ["FW","MF"].includes(srow.primary_position);
+  // fewer goals conceded = better: invert so a full bar means good
+  const c = pctsOf(pool, "conceded90")(me.conceded90);
+  pct.conceded = c==null ? null : 100 - c;
+  const out = pct[metric.key], val = pct.market_value_in_eur;
   let verdict;
-  if(!attacker) verdict = {chip:"NO VERDICT", color:"var(--muted)",
-    note:"Output percentiles rate attackers and midfielders; defensive and keeper stats arrive with the next pipeline phase."};
-  else if((srow.minutes||0) < MIN_MINUTES) verdict = {chip:"TOO FEW MINUTES", color:"var(--muted)",
+  if((srow.minutes||0) < MIN_MINUTES) verdict = {chip:"TOO FEW MINUTES", color:"var(--muted)",
     note:`Under ${MIN_MINUTES} minutes this season — rates aren't trustworthy, no verdict.`};
+  else if(out==null && metric.since && +srow.season < metric.since)
+    verdict = {chip:"NO VERDICT", color:"var(--muted)",
+      note:`${metric.label} data starts in ${metric.since} — earlier seasons can't be rated for this position.`};
   else if(out==null || val==null) verdict = {chip:"NO MARKET DATA", color:"var(--muted)",
     note:"Missing a market value or a big enough peer pool — can't compare price to output."};
   else{
@@ -306,7 +335,8 @@ function cardModel(srow, peers){
               gap < -VERDICT_GAP ? {chip:"PREMIUM", color:"var(--amber)", gap} :
                                    {chip:"FAIR VALUE", color:"var(--chalk-y)", gap};
   }
-  return {pct, verdict, pool, me, attacker};
+  if(metric.note) verdict.ceiling = metric.note;
+  return {pct, verdict, pool, me, metric};
 }
 
 /* ---------- render ---------- */
@@ -327,6 +357,22 @@ function render(rows, moves, srow, peers, seasons, curve = []){
       <div class="track"><div class="fill" style="width:${p??0}%;background:${color}"></div></div>
       <b class="nums"><span class="raw">${raw ?? ""}</span>${p??"—"}</b></div>`;
 
+  // literal booking cards: one dot per card, actual card colors (icon array —
+  // counts this small read better as objects than as a percentile)
+  const cardDots = r => {
+    const y = r.yellow_cards ?? 0, red = r.red_cards ?? 0, mins = r.minutes || 0;
+    const dot = (cls,n) => Array(Math.min(n,15)).fill(`<span class="${cls}"></span>`).join("")
+      + (n>15 ? `<span class="rate">×${n}</span>` : "");
+    const rate = (y+red) > 0 && mins
+      ? `1 card / ${Math.round(mins/(y+red)).toLocaleString("en")} min`
+      : "clean season";
+    return `<div class="cardrow"><label>Cards</label>
+      <div class="dots" role="img" aria-label="${y} yellow, ${red} red cards">
+        ${dot("yc",y)}${dot("rc",red)}
+        <span class="rate nums">${y}Y${red ? " "+red+"R" : ""} · ${rate}</span>
+      </div></div>`;
+  };
+
   const pens = (srow.penalties_attempted||0)
     ? `${srow.penalties_scored||0}/${srow.penalties_attempted}` : "—";
   const staleWarn = srow.value_is_stale
@@ -337,7 +383,7 @@ function render(rows, moves, srow, peers, seasons, curve = []){
   <div class="duo">
     <div class="pcard">
       <div class="head">
-        <div class="rating"><b class="nums">${m.pct.non_penalty_goals_assists_per90 ?? "—"}</b>
+        <div class="rating"><b class="nums">${m.pct[m.metric.key] ?? "—"}</b>
           <span>OUTPUT<br>PCT</span></div>
         <div class="idbox">
           <h1 class="disp">${esc(srow.player_name)}</h1>
@@ -348,23 +394,31 @@ function render(rows, moves, srow, peers, seasons, curve = []){
       <div class="verdict">
         <span class="chip" style="background:${m.verdict.color}">${m.verdict.chip}</span>
         <small>${m.verdict.gap!=null
-          ? `output ${m.pct.non_penalty_goals_assists_per90} pct vs value ${m.pct.market_value_in_eur} pct · gap ${m.verdict.gap>0?"+":""}${m.verdict.gap}`
+          ? `output ${m.pct[m.metric.key]} pct vs value ${m.pct.market_value_in_eur} pct · gap ${m.verdict.gap>0?"+":""}${m.verdict.gap}`
           : ""}</small>
       </div>
-      ${bar("npG+A /90", m.pct.non_penalty_goals_assists_per90, "var(--green)",
-            srow.non_penalty_goals_assists_per90?.toFixed(2))}
+      ${bar(m.metric.label, m.pct[m.metric.key], "var(--green)",
+            m.metric.fmt(srow[m.metric.key]))}
+      ${srow.primary_position === "GK" ? `
+      ${bar("Clean sheet %", m.pct.clean_sheet_pct, "var(--green)",
+            srow.clean_sheet_pct!=null ? srow.clean_sheet_pct.toFixed(1)+"%" : null)}
+      ${bar("Conceded /90", m.pct.conceded, "var(--green)",
+            m.me.conceded90!=null ? m.me.conceded90.toFixed(2) : null)}` : ""}
       ${bar("Availability", m.pct.minutes, "var(--blue)",
             Math.round(availability(srow)*100)+"%")}
-      ${bar("Start share", m.pct.start_share, "var(--blue)",
+      ${srow.primary_position === "GK" ? "" /* keepers never sub — share is always ~100% */ :
+        bar("Start share", m.pct.start_share, "var(--blue)",
             m.me.start_share!=null ? Math.round(m.me.start_share*100)+"%" : null)}
-      ${bar("Discipline", m.pct.discipline, "var(--chalk-y)",
-            m.me.cards90!=null ? m.me.cards90.toFixed(2)+"/90" : null)}
+      ${cardDots(srow)}
       ${bar("Value €", m.pct.market_value_in_eur, "var(--amber)", eur(srow.market_value_in_eur))}
       <div class="facts nums">
         <div><label>Minutes</label><b>${(srow.minutes??0).toLocaleString("en")}</b></div>
-        <div><label>G + A</label><b>${srow.goals??0} + ${srow.assists??0}</b></div>
+        <div><label>${srow.primary_position==="GK" ? "Saves · CS" : "G + A"}</label>
+          <b>${srow.primary_position==="GK"
+            ? `${srow.saves??"—"} · ${srow.clean_sheets??"—"}`
+            : `${srow.goals??0} + ${srow.assists??0}`}</b></div>
         <div><label>Value</label><b>${eur(srow.market_value_in_eur)}${staleWarn}</b></div>
-        <div><label>npG+A/90</label><b>${srow.non_penalty_goals_assists_per90?.toFixed(2) ?? "—"}</b></div>
+        <div><label>${esc(m.metric.label)}</label><b>${m.metric.fmt(srow[m.metric.key]) ?? "—"}</b></div>
         <div><label>Pens</label><b>${pens}</b></div>
         <div><label>Peers</label><b>${m.pool.length} ${esc(srow.primary_position ?? "")}</b></div>
       </div>
@@ -374,6 +428,7 @@ function render(rows, moves, srow, peers, seasons, curve = []){
         <div><label>Career G+A</label><b>${sum("goals")+sum("assists")}</b></div>
       </div>
       ${m.verdict.note ? `<p class="cardnote">${m.verdict.note}</p>` : ""}
+      ${m.verdict.ceiling ? `<p class="cardnote">${m.verdict.ceiling}</p>` : ""}
       <p class="cardnote">Percentiles vs same position, league and season, ≥${MIN_MINUTES} min. Peak value ${eur(peakVal||null)}.</p>
     </div>
 
@@ -386,20 +441,20 @@ function render(rows, moves, srow, peers, seasons, curve = []){
            below = premium zone. Amber dot = ${esc(srow.player_name)}.</p>
       </div>
       <div class="box">
-        <h2><span class="swatch" style="background:var(--blue)"></span>Minutes
-          <span class="swatch" style="background:var(--chalk-y)"></span>G+A /90
-          <span class="swatch" style="background:var(--green)"></span>npG+A /90
+        <h2>${trendLines(m, typical).map(([,c,lab])=>
+            `<span class="swatch" style="background:${c}"></span>${esc(lab)}`).join(" ")}
           <span class="plain">· career trend, hover for values</span></h2>
-        <div class="chartbox">${trendChart(rows)}</div>
+        <div class="chartbox">${trendChart(rows, trendLines(m, typical))}</div>
+        <p class="cap">Typical value = same-position average at that age. Lines are shape-fitted
+           to their own scale (different units) — real values in the tooltip.</p>
       </div>
     </div>
   </div>
 
   <section class="chart">
     <h2><span class="swatch" style="background:var(--amber)"></span>Market value by season
-      ${curve.length ? `<span class="swatch" style="background:var(--chalk-y)"></span>typical ${esc(srow.primary_position)} at his age` : ""}
       <span style="color:var(--muted);letter-spacing:0;text-transform:none">· dashed = transfer · dotted = club change</span></h2>
-    <div class="chartbox">${valueChart(rows, moves, typical)}</div>
+    <div class="chartbox">${valueChart(rows, moves)}</div>
   </section>
   ${moves.length ? `
   <details class="season-log">
@@ -453,7 +508,7 @@ function render(rows, moves, srow, peers, seasons, curve = []){
     history.pushState({}, "", u);
     load();
   });
-  wireTooltips(rows, m, typical, srow.primary_position);
+  wireTooltips(rows, m, typical);
 }
 
 /* ---------- value-vs-output scatter ---------- */
@@ -461,19 +516,19 @@ function scatter(m){
   const W=620, H=300, PL=44, PB=34, PT=14, PR=16;
   const px = p => PL + (W-PL-PR)*p/100;
   const py = p => H-PB - (H-PT-PB)*p/100;
-  if(m.pool.length < 8 || !m.attacker)
+  if(m.pool.length < 8 || m.pct[m.metric.key]==null)
     return `<svg viewBox="0 0 ${W} ${H}"><text x="${W/2}" y="${H/2}" text-anchor="middle"
-      fill="var(--muted)" font-size="14">${m.attacker ? "peer pool too small to rank" :
-      "attacking-output ranking doesn't apply to this position"}</text></svg>`;
+      fill="var(--muted)" font-size="14">${m.pool.length < 8 ? "peer pool too small to rank" :
+      `no ${m.metric.label} data for this season`}</text></svg>`;
   const vPct = pctsOf(m.pool, "market_value_in_eur");
-  const oPct = pctsOf(m.pool, "non_penalty_goals_assists_per90");
+  const oPct = pctsOf(m.pool, m.metric.key);
   const dots = m.pool.map((p,i)=>{
-    const x = vPct(p.market_value_in_eur), y = oPct(p.non_penalty_goals_assists_per90);
+    const x = vPct(p.market_value_in_eur), y = oPct(p[m.metric.key]);
     if(x==null||y==null) return "";
     return `<circle data-p="${i}" cx="${px(x).toFixed(1)}" cy="${py(y).toFixed(1)}" r="4.5"
       fill="rgba(242,245,239,.30)"/>`;
   }).join("");
-  const mx = m.pct.market_value_in_eur, my = m.pct.non_penalty_goals_assists_per90;
+  const mx = m.pct.market_value_in_eur, my = m.pct[m.metric.key];
   const me = (mx!=null && my!=null) ?
     `<circle cx="${px(mx)}" cy="${py(my)}" r="8" fill="var(--amber)" stroke="var(--card)" stroke-width="2"/>` : "";
   return `<svg viewBox="0 0 ${W} ${H}" id="schart" aria-label="Market value percentile vs output percentile among positional peers">
@@ -486,7 +541,7 @@ function scatter(m){
     <line x1="${PL}" x2="${PL}" y1="${PT}" y2="${H-PB}" stroke="var(--axis)"/>
     <text x="${PL}" y="${H-8}" fill="var(--axis)" font-size="11">market value percentile →</text>
     <text x="12" y="${H-PB}" fill="var(--axis)" font-size="11"
-      transform="rotate(-90 12 ${H-PB})">npG+A/90 percentile →</text>
+      transform="rotate(-90 12 ${H-PB})">${m.metric.label} percentile →</text>
   </svg>`;
 }
 
@@ -494,9 +549,8 @@ function scatter(m){
 const W=720, PAD_L=52, PAD_R=14;
 const bandX = (rows,i) => PAD_L + (W-PAD_L-PAD_R) * (i + .5) / rows.length;
 
-function valueChart(rows, moves = [], typical = {}){
+function valueChart(rows, moves = []){
   const H=210, PT=14, PB=26;
-  const typVals = rows.map(r=>r.age!=null ? typical[r.age] ?? null : null);
   const seasonIdx = Object.fromEntries(rows.map((r,i)=>[r.season,i]));
   const recorded = new Set(moves.map(t=>seasonIdx[moveSeason(t.transfer_date)])
                                 .filter(i=>i!=null));
@@ -526,16 +580,8 @@ function valueChart(rows, moves = [], typical = {}){
       <title>${s}: ${[...prev.teams].join("/")} → ${[...cur.teams].join("/")} (no transfer record)</title></line>`;
   }).join("");
   const vals = rows.map(r=>r.market_value_in_eur);
-  // same € axis for both series — include the curve so it never clips
-  const max = Math.max(...vals.filter(v=>v!=null), ...typVals.filter(v=>v!=null), 1);
+  const max = Math.max(...vals.filter(v=>v!=null), 1);
   const y = v => PT + (H-PT-PB) * (1 - v/max);
-  const typPts = typVals.map((v,i)=>v==null?null:[bandX(rows,i),y(v)]);
-  const typSeg=[]; let typRun=[];
-  for(const p of typPts){ if(p) typRun.push(p); else {if(typRun.length>1)typSeg.push(typRun); typRun=[];} }
-  if(typRun.length>1) typSeg.push(typRun);
-  const typLine = typSeg.map(s=>`<path fill="none" stroke="var(--chalk-y)" stroke-width="2"
-    stroke-dasharray="6 4" opacity=".8"
-    d="M${s.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")}"/>`).join("");
   const pts = rows.map((r,i)=>vals[i]==null?null:[bandX(rows,i),y(vals[i])]);
   const seg=[]; let run=[];
   for(const p of pts){ if(p) run.push(p); else {if(run.length)seg.push(run); run=[];} }
@@ -551,7 +597,6 @@ function valueChart(rows, moves = [], typical = {}){
     <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
     ${vlines}${synth}
     <path d="${area}" fill="var(--amber)" opacity=".14"/>
-    ${typLine}
     <path d="${line}" fill="none" stroke="var(--amber)" stroke-width="2"/>
     ${pts.map((p,i)=>p?`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="var(--amber)"
         stroke="var(--card)" stroke-width="2"/>`:"").join("")}
@@ -561,8 +606,20 @@ function valueChart(rows, moves = [], typical = {}){
   </svg>`;
 }
 
-// three shape-fitted lines (units differ — no shared axis; real values in tooltip)
-function trendChart(rows){
+// a trend-line key is either a row field name or an accessor function
+// (the age-curve line has no column — it looks up the per-age average)
+const asGetter = key => typeof key === "function" ? key : (r => r[key]);
+
+// position-aware line set shared by the trend chart, its legend and tooltip
+const trendLines = (m, typical = {}) => [
+  ["minutes", "var(--blue)", "Minutes", v=>v ?? "—"],
+  [r => r.age!=null ? typical[r.age] : null, "var(--chalk-y)", "Typical value",
+    v=>v!=null ? eur(v) : "—"],
+  [m.metric.key, "var(--green)", m.metric.label, v=>m.metric.fmt(v) ?? "—"],
+];
+
+// shape-fitted lines (units differ — no shared axis; real values in tooltip)
+function trendChart(rows, lines){
   const H=150, PT=12, PB=24;
   const line = (vals, color) => {
     const vmax = Math.max(...vals.filter(v=>v!=null), 1e-9);
@@ -574,11 +631,9 @@ function trendChart(rows){
     return seg.map(s=>`<path fill="none" stroke="${color}" stroke-width="2"
       d="M${s.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")}"/>`).join("");
   };
-  return `<svg viewBox="0 0 ${W} ${H}" id="tchart" aria-label="Career trend: minutes, goals plus assists per 90, and non-penalty goals plus assists per 90">
+  return `<svg viewBox="0 0 ${W} ${H}" id="tchart" aria-label="Career trend lines">
     <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
-    ${line(rows.map(r=>r.minutes), "var(--blue)")}
-    ${line(rows.map(r=>r.goals_assists_per90), "var(--chalk-y)")}
-    ${line(rows.map(r=>r.non_penalty_goals_assists_per90), "var(--green)")}
+    ${lines.map(([key,color])=>line(rows.map(asGetter(key)), color)).join("")}
     ${xAxis(rows,H,PB)}
     <line id="tcross" y1="${PT}" y2="${H-PB}" stroke="var(--axis)" stroke-dasharray="3 3"
         visibility="hidden"/>
@@ -593,7 +648,7 @@ function xAxis(rows,H,PB){
 }
 
 /* ---------- hover layer ---------- */
-function wireTooltips(rows, m, typical = {}, pos = ""){
+function wireTooltips(rows, m, typical = {}){
   const tip = document.getElementById("tip");
   const show = (e,html) => { tip.innerHTML = html; tip.style.display = "block";
     tip.style.left = Math.min(e.clientX+14, innerWidth-190)+"px";
@@ -606,7 +661,7 @@ function wireTooltips(rows, m, typical = {}, pos = ""){
     if(!c){ hide(); return; }
     const p = m.pool[+c.dataset.p];
     show(e, `<div class="t">${esc(p.player_name)} · ${esc(p.team)}</div>
-      ${p.non_penalty_goals_assists_per90?.toFixed(2) ?? "—"} npG+A/90 · ${eur(p.market_value_in_eur)}
+      ${m.metric.fmt(p[m.metric.key]) ?? "—"} ${esc(m.metric.label)} · ${eur(p.market_value_in_eur)}
       · ${p.minutes} min`);
   });
   if(s) s.addEventListener("mouseleave", hide);
@@ -622,24 +677,19 @@ function wireTooltips(rows, m, typical = {}, pos = ""){
     const i = idxFromEvent(v,e), r = rows[i];
     cross.setAttribute("x1",bandX(rows,i)); cross.setAttribute("x2",bandX(rows,i));
     cross.setAttribute("visibility","visible");
-    const typ = r.age!=null ? typical[r.age] : null;
     show(e, `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
-      ${eur(r.market_value_in_eur)}${r.value_is_stale?" ⚠":""}${typ!=null
-        ? `<br>typical ${esc(pos)} at ${r.age}: ${eur(typ)}` : ""}`);
+      ${eur(r.market_value_in_eur)}${r.value_is_stale?" ⚠":""}`);
   });
   v.addEventListener("mouseleave", () => { hide(); cross.setAttribute("visibility","hidden"); });
 
   const t = document.getElementById("tchart"), tc = document.getElementById("tcross");
+  const tl = trendLines(m, typical);
   t.addEventListener("mousemove", e => {
     const i = idxFromEvent(t,e), r = rows[i];
     tc.setAttribute("x1",bandX(rows,i)); tc.setAttribute("x2",bandX(rows,i));
     tc.setAttribute("visibility","visible");
     show(e, `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
-      ${r.minutes||0} min · ${(r.goals||0)}G ${(r.assists||0)}A<br>
-      ${r.goals_assists_per90 != null
-        ? r.goals_assists_per90.toFixed(2)+" G+A/90 · "+
-          (r.non_penalty_goals_assists_per90?.toFixed(2) ?? "—")+" npG+A/90"
-        : "rates n/a (<450 min)"}`);
+      ${tl.map(([key,,lab,fmt])=>`${fmt(asGetter(key)(r))} ${esc(lab)}`).join(" · ")}`);
   });
   t.addEventListener("mouseleave", () => { hide(); tc.setAttribute("visibility","hidden"); });
 }
