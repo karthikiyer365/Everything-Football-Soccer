@@ -12,6 +12,7 @@ from soccerhub.readers.transfermarkt import (
 from soccerhub.pipelines import (
     build_player_season,
     build_player_xref,
+    push_age_curve,
     push_to_supabase,
     push_transfers,
     read_hub,
@@ -30,6 +31,7 @@ __all__ = [
     "build_player_season",
     "push_to_supabase",
     "push_transfers",
+    "push_age_curve",
     "read_hub",
     "run_season",
 ]

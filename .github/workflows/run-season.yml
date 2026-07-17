@@ -64,3 +64,25 @@ jobs:
           from soccerhub import push_transfers
           print(push_transfers(force=True))
           "
+
+  age-curve:
+    needs: seasons  # derived from player_season — run after it refreshes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e "Soccer Data Hub"
+      - name: rebuild age_curve table
+        working-directory: Soccer Data Hub
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # read side of the job; this key is public by design (shipped in site JS)
+          SUPABASE_PUBLISHABLE_KEY: "sb_publishable_Qy0bJ4CdrxffuJGNq12ebw_r0-Z3qD-"
+        run: |
+          python -c "
+          from soccerhub import push_age_curve
+          print(push_age_curve())
+          "

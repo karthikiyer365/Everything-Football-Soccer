@@ -13,12 +13,14 @@ __all__ = [
     "build_player_season",
     "push_to_supabase",
     "push_transfers",
+    "push_age_curve",
     "read_hub",
     "run_season",
 ]
 
 XREF_CONFLICT_KEY = "league,season,team,fbref_name"
 TRANSFERS_CONFLICT_KEY = "tm_id,transfer_date"  # matches 0002 PK
+AGE_CURVE_CONFLICT_KEY = "primary_position,age"  # matches 0005 PK
 
 
 def push_transfers(force: bool = False) -> int:
@@ -31,6 +33,34 @@ def push_transfers(force: bool = False) -> int:
 
     m = fetch_transfermarkt_transfers(force=force)
     return upsert_df(pd.read_parquet(m.path), "transfers", TRANSFERS_CONFLICT_KEY)
+
+
+def push_age_curve(min_minutes: int = 450, min_n: int = 30) -> int:
+    """player_season -> avg market value by (position, age) for the dashboard
+    overlay. Derived from the hub itself (PostgREST aggregates are disabled),
+    so cron must run it after the season jobs."""
+    from soccerhub.pipelines.query import read_hub
+    from soccerhub.pipelines.supa import upsert_df
+
+    df = read_hub(
+        "player_season",
+        select="primary_position,age,market_value_in_eur,minutes",
+    )
+    df = df[
+        (df["minutes"].fillna(0) >= min_minutes)
+        & df["market_value_in_eur"].notna()
+        & df["age"].notna()
+        & df["primary_position"].notna()
+    ]
+    g = (
+        df.groupby(["primary_position", "age"])["market_value_in_eur"]
+        .agg(avg_value_eur="mean", n="count")
+        .reset_index()
+    )
+    g = g[g["n"] >= min_n]  # thin age buckets (16, 40+) make a jumpy curve
+    g["avg_value_eur"] = g["avg_value_eur"].round().astype("Int64")
+    g["age"] = g["age"].astype(int)
+    return upsert_df(g, "age_curve", AGE_CURVE_CONFLICT_KEY)
 
 
 def push_xref(manifest: Manifest, league: str, season: str) -> int:
