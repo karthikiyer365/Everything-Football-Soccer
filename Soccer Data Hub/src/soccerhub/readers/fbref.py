@@ -51,17 +51,23 @@ def _season_to_code(season: str) -> str:
     return f"{y % 100:02d}{(y + 1) % 100:02d}"
 
 
-def fetch_fbref_season(league: str, season: str, force: bool = False) -> Manifest:
+def fetch_fbref_season(
+    league: str, season: str, force: bool = False, stat_type: str = "standard"
+) -> Manifest:
     """Player season stats for one league-season from FBref.
 
     ``season`` is the canonical start year ('2021' = 2021-22 season).
+    ``stat_type`` is any table soccerdata supports (standard, defense, keeper…).
     """
 
     def produce():
         return sd.FBref(
             leagues=league, seasons=_season_to_code(season)
-        ).read_player_season_stats()
+        ).read_player_season_stats(stat_type=stat_type)
 
-    return cached_fetch(
-        "fbref", "player_season", {"league": league, "season": season}, produce, force
-    )
+    # legacy cache keys for "standard" predate the param — don't invalidate them
+    params = {"league": league, "season": season}
+    if stat_type != "standard":
+        params["stat_type"] = stat_type
+
+    return cached_fetch("fbref", "player_season", params, produce, force)

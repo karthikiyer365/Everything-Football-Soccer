@@ -7,21 +7,48 @@ def _cache_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("SOCCERHUB_CACHE", str(tmp_path))
 
 
+_IDX = pd.MultiIndex.from_tuples(
+    [("ENG-Premier League", "2324", "Arsenal", "Bukayo Saka"),
+     ("ENG-Premier League", "2324", "Arsenal", "Totally Unknown")],
+    names=["league", "season", "team", "player"],
+)
+
+
 def _fake_fbref():
     cols = pd.MultiIndex.from_tuples([
         ("nation", ""), ("pos", ""), ("age", ""), ("born", ""),
-        ("Playing Time", "MP"), ("Playing Time", "Min"),
+        ("Playing Time", "MP"), ("Playing Time", "Min"), ("Playing Time", "90s"),
         ("Performance", "Gls"), ("Performance", "Ast"),
     ])
-    idx = pd.MultiIndex.from_tuples(
-        [("ENG-Premier League", "2324", "Arsenal", "Bukayo Saka"),
-         ("ENG-Premier League", "2324", "Arsenal", "Totally Unknown")],
-        names=["league", "season", "team", "player"],
-    )
     return pd.DataFrame(
-        [["ENG", "FW", 21, 2001, 38, 3300, 14, 9],
-         ["ENG", "MF", 30, 1993, 2, 90, 0, 0]],
-        index=idx, columns=cols,
+        [["ENG", "FW", 21, 2001, 38, 3300, 36.7, 14, 9],
+         ["ENG", "GK", 30, 1993, 10, 900, 10.0, 0, 0]],
+        index=_IDX, columns=cols,
+    )
+
+
+def _fake_misc():
+    cols = pd.MultiIndex.from_tuples([
+        ("born", ""), ("Performance", "TklW"), ("Performance", "Int"),
+        ("Performance", "Fls"), ("Performance", "Crs"),  # Crs must be dropped
+    ])
+    return pd.DataFrame(
+        [[2001, 30, 25, 12, 99],
+         [1993, 1, 0, 2, 0]],
+        index=_IDX, columns=cols,
+    )
+
+
+def _fake_keeper():
+    cols = pd.MultiIndex.from_tuples([
+        ("born", ""), ("Performance", "GA"), ("Performance", "SoTA"),
+        ("Performance", "Saves"), ("Performance", "Save%"),
+        ("Performance", "CS"), ("Performance", "CS%"),
+        ("Penalty Kicks", "Save%"),  # colliding name — canon selection drops it
+    ])
+    return pd.DataFrame(
+        [[1993, 30, 100, 71, 70.9, 8, 21.1, 25.0]],
+        index=_IDX[1:], columns=cols,
     )
 
 
@@ -126,6 +153,8 @@ def test_clean_rules():
         "goals_assists_per90": [0.8, 13.5],
         "non_penalty_goals_per90": [0.4, 9.0],
         "non_penalty_goals_assists_per90": [0.7, 13.5],
+        "tackles_interceptions_per90": [2.1, 8.0],
+        "save_pct": [None, 100.0],
         "value_date": ["2024-05-01", "2022-01-01"],  # 2nd >1yr before 2024-06-30
         "market_value_in_eur": [1e7, 1e6],
     })
@@ -135,6 +164,9 @@ def test_clean_rules():
     assert out.loc[0, "goals_per90"] == 0.5          # enough minutes: kept
     assert pd.isna(out.loc[1, "goals_per90"])        # 100 min: rate nulled
     assert pd.isna(out.loc[1, "goals_assists_per90"])
+    assert pd.isna(out.loc[1, "tackles_interceptions_per90"])  # new rates same floor
+    assert pd.isna(out.loc[1, "save_pct"])
+    assert out.loc[0, "tackles_interceptions_per90"] == 2.1
     assert out.loc[1, "minutes"] == 100              # counting stats untouched
     assert out.value_is_stale.tolist() == [False, True]
 
@@ -143,10 +175,19 @@ def test_build_player_season_merges_value(monkeypatch):
     import soccerhub.pipelines.player_season as ps
     from soccerhub.cache import cached_fetch
 
-    m_fbref = cached_fetch("fbref", "player_season",
-                           {"league": "ENG-Premier League", "season": "2023"},
-                           _fake_fbref)
-    monkeypatch.setattr(ps, "fetch_fbref_season", lambda l, s, force=False: m_fbref)
+    manifests = {
+        "standard": cached_fetch("fbref", "player_season",
+            {"league": "ENG-Premier League", "season": "2023"}, _fake_fbref),
+        "misc": cached_fetch("fbref", "player_season",
+            {"league": "ENG-Premier League", "season": "2023", "stat_type": "misc"},
+            _fake_misc),
+        "keeper": cached_fetch("fbref", "player_season",
+            {"league": "ENG-Premier League", "season": "2023", "stat_type": "keeper"},
+            _fake_keeper),
+    }
+    monkeypatch.setattr(
+        ps, "fetch_fbref_season",
+        lambda l, s, force=False, stat_type="standard": manifests[stat_type])
 
     xref = pd.DataFrame({
         "fbref_name": ["Bukayo Saka", "Totally Unknown"],
@@ -179,3 +220,12 @@ def test_build_player_season_merges_value(monkeypatch):
     unk = df.loc["Totally Unknown"]
     assert pd.isna(unk["market_value_in_eur"])  # kept, not dropped
     assert unk["xref_method"] == "unmatched"
+
+    # misc merged; per-90 computed off nineties; Crs never lands
+    assert saka["tackles_won"] == 30
+    assert saka["tackles_interceptions_per90"] == 1.5  # (30+25)/36.7
+    assert "crs" not in df.columns and "performance_crs" not in df.columns
+    # keeper merged only onto its row; PK Save% collision dropped by canon pick
+    assert unk["save_pct"] == 70.9
+    assert unk["clean_sheet_pct"] == 21.1
+    assert pd.isna(saka["save_pct"])

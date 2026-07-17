@@ -45,6 +45,41 @@ def flatten_fbref(df: pd.DataFrame) -> pd.DataFrame:
     return flat[flat["player_name"].notna()]
 
 
+# extra stat pages: only the columns the card needs, one canon per page.
+# (per-league fbref 'misc' is the defensive table this soccerdata exposes —
+# there is no 'defense' stat_type outside the Big5-combined mode)
+MISC_CANON = {
+    ("Performance", "TklW"): "tackles_won",
+    ("Performance", "Int"): "interceptions",
+    ("Performance", "Fls"): "fouls_committed",
+}
+KEEPER_CANON = {
+    ("Performance", "GA"): "goals_against",
+    ("Performance", "SoTA"): "shots_on_target_against",
+    ("Performance", "Saves"): "saves",
+    ("Performance", "Save%"): "save_pct",   # selecting by canon key also drops
+    ("Performance", "CS"): "clean_sheets",  # the colliding ('Penalty Kicks','Save%')
+    ("Performance", "CS%"): "clean_sheet_pct",
+}
+EXTRA_STATS_SINCE = 2017  # StatsBomb-era tables; earlier pages not backfilled
+
+
+def extra_stats(league: str, season: str, stat_type: str, canon: dict,
+                refetch: bool = False) -> pd.DataFrame:
+    """One extra fbref page -> flat frame keyed (player_name, team, birth_year)."""
+    df = pd.read_parquet(
+        fetch_fbref_season(league, season, force=refetch, stat_type=stat_type).path
+    )
+    born = ("born", "")
+    keep = [c for c in df.columns if tuple(c) in canon or tuple(c) == born]
+    df = df[keep]
+    df.columns = [canon.get(tuple(c), "birth_year") for c in keep]
+    df = df.reset_index().rename(columns={"player": "player_name"})
+    df = df[["player_name", "team", "birth_year", *canon.values()]]
+    return df[df["player_name"].notna()].drop_duplicates(
+        ["player_name", "team", "birth_year"])
+
+
 def season_end(season: str) -> str:
     """'2023' (2023-24 season) -> '2024-06-30'."""
     return f"{int(season) + 1}-06-30"
@@ -53,6 +88,7 @@ def season_end(season: str) -> str:
 RATE_COLS = [
     "goals_per90", "assists_per90", "goals_assists_per90",
     "non_penalty_goals_per90", "non_penalty_goals_assists_per90",
+    "tackles_interceptions_per90", "save_pct", "clean_sheet_pct",
 ]
 MIN_MINUTES_FOR_RATES = 450  # ponytail: one global floor; 5 full games
 
@@ -91,6 +127,22 @@ def build_player_season(
             pd.read_parquet(fetch_fbref_season(league, season, force=refetch).path)
         )
         stats["season"] = season  # canonical start-year label, not fbref's '2324'
+
+        if int(season) >= EXTRA_STATS_SINCE:
+            key = ["player_name", "team", "birth_year"]
+            for st, canon in (("misc", MISC_CANON), ("keeper", KEEPER_CANON)):
+                stats = stats.merge(
+                    extra_stats(league, season, st, canon, refetch=refetch),
+                    on=key, how="left",
+                )
+            n90 = stats["nineties"].where(stats["nineties"] > 0)
+            stats["tackles_interceptions_per90"] = (
+                (stats["tackles_won"].fillna(0) + stats["interceptions"].fillna(0))
+                / n90
+            ).round(2)
+            # absent from the misc page entirely -> unknown, not zero activity
+            stats.loc[stats["tackles_won"].isna() & stats["interceptions"].isna(),
+                      "tackles_interceptions_per90"] = pd.NA
 
         xref = pd.read_parquet(build_player_xref(league, season).path).rename(
             columns={"method": "xref_method", "confidence": "xref_confidence"}
