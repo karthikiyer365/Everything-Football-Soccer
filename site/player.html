@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Player Dashboard — SoccerHub</title>
-<meta name="description" content="One career on one page: goals, minutes and market value season by season, across Europe's big five leagues.">
+<meta name="description" content="Is the playtime and output on par with the market value? One card per player-season, ranked against positional peers.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
 <style>
   :root{
@@ -42,26 +42,56 @@
   #results button:hover,#results button:focus-visible{background:rgba(255,180,58,.12);outline:none}
   #results .sub{color:var(--tag);font-size:.8rem;white-space:nowrap}
 
-  main{max-width:960px;margin:0 auto;padding:28px 20px 80px}
+  main{max-width:1080px;margin:0 auto;padding:24px 20px 80px}
   .empty{color:var(--muted);text-align:center;padding:80px 20px;max-width:46ch;margin:0 auto}
   .empty .disp{color:var(--line);font-size:1.6rem}
 
-  .hero{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 18px;margin:8px 0 4px}
-  .hero h1{font-size:clamp(1.9rem,5vw,3rem);margin:0;line-height:1}
-  .hero .meta{color:var(--muted);font-size:.95rem}
-  .flag{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;
-        border:1px solid var(--border);border-radius:999px;padding:2px 10px;color:var(--chalk-y)}
-  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-         gap:12px;margin:20px 0 8px}
-  .tile{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px 14px}
-  .tile .k{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--tag)}
-  .tile .v{font-size:1.5rem;font-weight:700;margin-top:2px}
-  .tile .s{font-size:.78rem;color:var(--muted)}
+  /* season chips */
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px}
+  .chips button{border:1px solid var(--border);background:var(--card);color:var(--muted);
+       border-radius:999px;padding:4px 12px;font:inherit;font-size:.8rem;cursor:pointer}
+  .chips button[aria-pressed="true"]{background:var(--amber);color:#20160a;
+       border-color:var(--amber);font-weight:700}
+  .chips button:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
 
-  section.chart{background:var(--card);border:1px solid var(--border);border-radius:4px;
-        padding:16px 16px 10px;margin-top:16px}
-  section.chart h2{margin:0 0 2px;font-size:.8rem;letter-spacing:.16em;
-        text-transform:uppercase;color:var(--tag);display:flex;gap:8px;align-items:center}
+  /* card + scatter grid */
+  .duo{display:grid;grid-template-columns:390px 1fr;gap:22px;align-items:start}
+  @media(max-width:900px){.duo{grid-template-columns:1fr}}
+  .panel{display:grid;gap:16px}
+
+  .pcard{border-radius:18px;padding:24px 24px 20px;
+        background:linear-gradient(160deg,#2a4d2f 0%,#17331e 55%,#0e2413 100%);
+        border:1px solid rgba(255,180,58,.55);
+        box-shadow:0 18px 50px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08)}
+  .pcard .head{display:flex;gap:16px;align-items:flex-start}
+  .rating{text-align:center;min-width:74px}
+  .rating b{display:block;font-size:56px;line-height:.9;color:var(--amber)}
+  .rating span{font-size:10.5px;letter-spacing:.12em;color:var(--chalk-y)}
+  .idbox h1{margin:0;font-size:34px;line-height:.95}
+  .idbox p{margin:6px 0 0;color:var(--muted);font-size:12.5px}
+  .verdict{margin:16px 0 2px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .chip{color:#0e2413;font-weight:800;padding:6px 14px;border-radius:999px;
+        font-size:13px;letter-spacing:.08em}
+  .verdict small{color:var(--muted)}
+  .bar{display:grid;grid-template-columns:92px 1fr 96px;gap:10px;align-items:center;
+       font-size:12px;margin:8px 0}
+  .bar label{letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+  .bar .track{height:9px;border-radius:5px;background:rgba(242,245,239,.14);overflow:hidden}
+  .bar .fill{height:100%;border-radius:5px}
+  .bar b{text-align:right}
+  .bar .raw{color:var(--muted);font-weight:400;margin-right:8px}
+  .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:16px;
+         border-top:1px solid rgba(242,245,239,.15);padding-top:14px;text-align:center}
+  .facts label{display:block;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .facts b{font-size:17px}
+  .cardnote{margin:14px 0 0;font-size:11.5px;color:var(--muted)}
+  .warn{color:var(--chalk-y);cursor:help}
+
+  .box{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px}
+  .box h2{margin:0 0 8px;font-size:.8rem;letter-spacing:.16em;
+        text-transform:uppercase;color:var(--tag);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .box h2 .plain{color:var(--muted);letter-spacing:0;text-transform:none}
+  .box p.cap{margin:8px 0 0;font-size:12px;color:var(--muted)}
   .swatch{width:10px;height:10px;border-radius:2px;display:inline-block}
   .chartbox{position:relative}
   .chartbox svg{width:100%;height:auto;display:block}
@@ -70,19 +100,24 @@
        color:var(--line);box-shadow:0 4px 16px rgba(0,0,0,.5)}
   #tip .t{color:var(--tag);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
 
-  .season-log{margin-top:22px;background:var(--card);border:1px solid var(--border);
-       border-radius:4px;overflow-x:auto}
+  section.chart{background:var(--card);border:1px solid var(--border);border-radius:4px;
+        padding:16px 16px 10px;margin-top:22px}
+  section.chart h2{margin:0 0 2px;font-size:.8rem;letter-spacing:.16em;
+        text-transform:uppercase;color:var(--tag);display:flex;gap:8px;align-items:center}
+
+  details.season-log{margin-top:22px;background:var(--card);border:1px solid var(--border);
+       border-radius:4px}
+  details.season-log summary{padding:14px 16px;font-size:.8rem;letter-spacing:.16em;
+       text-transform:uppercase;color:var(--tag);cursor:pointer}
+  details.season-log .scroll{overflow-x:auto}
   table{border-collapse:collapse;width:100%;font-size:.88rem;min-width:640px}
-  caption{text-align:left;padding:14px 16px 6px;font-size:.8rem;letter-spacing:.16em;
-       text-transform:uppercase;color:var(--tag)}
   th,td{padding:8px 14px;text-align:right;border-top:1px solid rgba(242,245,239,.08)}
   th{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--tag);
-     font-weight:600;border-top:0}
+     font-weight:600}
   th:first-child,td:first-child,th:nth-child(2),td:nth-child(2),
   th:nth-child(3),td:nth-child(3){text-align:left}
   tbody tr:hover{background:rgba(255,180,58,.06)}
   .dim{color:var(--muted)}
-  .warn{color:var(--chalk-y);cursor:help}
 </style>
 </head>
 <body>
@@ -107,6 +142,8 @@
 <script>
 const SUPABASE_URL = "https://rgnzemkdldohplwbxxwy.supabase.co";
 const ANON_KEY = "sb_publishable_Qy0bJ4CdrxffuJGNq12ebw_r0-Z3qD-";
+const MIN_MINUTES = 450;          // pipeline nulls rates below this — same floor here
+const VERDICT_GAP = 15;           // |output pct − value pct| beyond this = not "fair"
 
 async function hub(table, params){
   const q = new URLSearchParams(params);
@@ -190,7 +227,34 @@ async function load(){
     return; }
   if(!rows.length){ main.innerHTML =
     `<div class="empty">No seasons found for this player.</div>`; return; }
-  render(rows, moves);
+
+  // card season: ?s= override, else latest with enough minutes, else latest
+  const seasons = [...new Set(rows.map(r=>r.season))].sort();
+  let season = u.get("s");
+  if(!seasons.includes(season)){
+    season = [...rows].reverse().find(r=>(r.minutes||0) >= MIN_MINUTES)?.season
+           ?? seasons[seasons.length-1];
+  }
+  // a mid-season mover has two rows; the card rates the bigger stint
+  const srow = rows.filter(r=>r.season===season)
+                   .sort((a,b)=>(b.minutes||0)-(a.minutes||0))[0];
+
+  let peers = [], curve = [];
+  if(srow.primary_position){
+    // independent fetches: losing the curve must not cost the card its percentiles
+    const [pr, cr] = await Promise.allSettled([
+      hub("player_season", {
+        select: "player_name,team,minutes,starts,matches_played,yellow_cards," +
+                "red_cards,nineties,non_penalty_goals_assists_per90,market_value_in_eur",
+        league: `eq.${srow.league}`, season: `eq.${season}`,
+        primary_position: `eq.${srow.primary_position}`, minutes: `gte.${MIN_MINUTES}`}),
+      hub("age_curve", {select: "age,avg_value_eur",
+        primary_position: `eq.${srow.primary_position}`, order: "age"}),
+    ]);
+    if(pr.status === "fulfilled") peers = pr.value;
+    if(cr.status === "fulfilled") curve = cr.value;
+  }
+  render(rows, moves, srow, peers, seasons, curve);
 }
 
 /* transfer date -> season start-year label ('2022-07-01' -> '2022') */
@@ -199,54 +263,149 @@ const moveSeason = d => {
   return String(m >= 7 ? y : y-1);
 };
 
-function render(rows, moves = []){
+/* ---------- percentiles ---------- */
+// pct(v) = share of pool strictly below v; pool = peers with the stat present
+function pctsOf(pool, key){
+  const vals = pool.map(p=>p[key]).filter(v=>v!=null).sort((a,b)=>a-b);
+  const n = vals.length;
+  return v => {
+    if(v==null || n < 8) return null;   // tiny pools rank nothing meaningfully
+    let lo=0, hi=n;
+    while(lo<hi){ const m=(lo+hi)>>1; if(vals[m]<v) lo=m+1; else hi=m; }
+    return Math.round(100*lo/Math.max(n-1,1));
+  };
+}
+const startShare = r => r.matches_played ? (r.starts||0)/r.matches_played : null;
+const cardsPer90 = r => r.nineties ? ((r.yellow_cards||0)+(r.red_cards||0))/r.nineties : null;
+// league seasons: 34 games in the Bundesliga, 38 everywhere else in the big five
+const availability = r => Math.min(1, (r.minutes||0) /
+  ((r.league?.startsWith("GER") ? 34 : 38) * 90));
+
+function cardModel(srow, peers){
+  const pool = peers.map(p=>({...p, start_share: startShare(p), cards90: cardsPer90(p)}));
+  const me = {...srow, start_share: startShare(srow), cards90: cardsPer90(srow)};
+  const pct = {};
+  for(const k of ["non_penalty_goals_assists_per90",
+                  "minutes","start_share","market_value_in_eur"])
+    pct[k] = pctsOf(pool, k)(me[k]);
+  // fewer cards = better: invert so a full bar means clean
+  const c = pctsOf(pool, "cards90")(me.cards90);
+  pct.discipline = c==null ? null : 100 - c;
+  const out = pct.non_penalty_goals_assists_per90, val = pct.market_value_in_eur;
+  const attacker = ["FW","MF"].includes(srow.primary_position);
+  let verdict;
+  if(!attacker) verdict = {chip:"NO VERDICT", color:"var(--muted)",
+    note:"Output percentiles rate attackers and midfielders; defensive and keeper stats arrive with the next pipeline phase."};
+  else if((srow.minutes||0) < MIN_MINUTES) verdict = {chip:"TOO FEW MINUTES", color:"var(--muted)",
+    note:`Under ${MIN_MINUTES} minutes this season — rates aren't trustworthy, no verdict.`};
+  else if(out==null || val==null) verdict = {chip:"NO MARKET DATA", color:"var(--muted)",
+    note:"Missing a market value or a big enough peer pool — can't compare price to output."};
+  else{
+    const gap = out - val;
+    verdict = gap > VERDICT_GAP  ? {chip:"BARGAIN", color:"var(--green)", gap} :
+              gap < -VERDICT_GAP ? {chip:"PREMIUM", color:"var(--amber)", gap} :
+                                   {chip:"FAIR VALUE", color:"var(--chalk-y)", gap};
+  }
+  return {pct, verdict, pool, me, attacker};
+}
+
+/* ---------- render ---------- */
+function render(rows, moves, srow, peers, seasons, curve = []){
+  const typical = Object.fromEntries(curve.map(c=>[c.age, c.avg_value_eur]));
   const last = rows[rows.length-1];
   const sum = k => rows.reduce((a,r)=>a+(r[k]||0),0);
-  const latestVal = [...rows].reverse().find(r=>r.market_value_in_eur!=null);
   const peakVal = rows.reduce((a,r)=>Math.max(a,r.market_value_in_eur||0),0);
+  const clubs = new Set(rows.map(r=>r.team)).size;
   document.title = `${last.player_name} — SoccerHub`;
+  const m = cardModel(srow, peers);
 
-  const flags = [];
-  if(latestVal && latestVal.value_is_stale)
-    flags.push(`<span class="flag" title="Transfermarkt stopped re-valuing this player more than a year before that season's end">⚠ value may be stale</span>`);
-  if(last.xref_method === "unmatched")
-    flags.push(`<span class="flag" title="No Transfermarkt identity matched — market values unavailable">no market data</span>`);
+  const chips = seasons.map(s=>
+    `<button data-s="${esc(s)}" aria-pressed="${s===srow.season}">${esc(s)}</button>`).join("");
+
+  const bar = (label,p,color,raw) => `
+    <div class="bar"><label>${label}</label>
+      <div class="track"><div class="fill" style="width:${p??0}%;background:${color}"></div></div>
+      <b class="nums"><span class="raw">${raw ?? ""}</span>${p??"—"}</b></div>`;
+
+  const pens = (srow.penalties_attempted||0)
+    ? `${srow.penalties_scored||0}/${srow.penalties_attempted}` : "—";
+  const staleWarn = srow.value_is_stale
+    ? ' <span class="warn" title="valuation more than a year old at season end">⚠</span>' : "";
 
   document.getElementById("main").innerHTML = `
-  <header class="hero">
-    <h1 class="disp">${esc(last.player_name)}</h1>
-    <span class="meta">${esc(last.nationality ?? "")} · ${esc(last.primary_position ?? last.position ?? "")}
-      ${last.birth_year ? "· b."+last.birth_year : ""} · ${esc(last.team)} (${esc(last.season)})</span>
-    ${flags.join(" ")}
-  </header>
-  <div class="tiles nums">
-    <div class="tile"><div class="k">Latest value</div>
-      <div class="v">${eur(latestVal?.market_value_in_eur)}</div>
-      <div class="s">${latestVal ? "as of "+esc(latestVal.value_date ?? latestVal.season) : "no match"}</div></div>
-    <div class="tile"><div class="k">Peak value</div>
-      <div class="v">${eur(peakVal || null)}</div><div class="s">career high</div></div>
-    <div class="tile"><div class="k">Goals</div>
-      <div class="v">${sum("goals")}</div><div class="s">${sum("assists")} assists</div></div>
-    <div class="tile"><div class="k">Minutes</div>
-      <div class="v">${sum("minutes").toLocaleString("en")}</div>
-      <div class="s">${sum("matches_played")} matches · ${rows.length} seasons</div></div>
+  <div class="chips nums" id="chips">${chips}</div>
+  <div class="duo">
+    <div class="pcard">
+      <div class="head">
+        <div class="rating"><b class="nums">${m.pct.non_penalty_goals_assists_per90 ?? "—"}</b>
+          <span>OUTPUT<br>PCT</span></div>
+        <div class="idbox">
+          <h1 class="disp">${esc(srow.player_name)}</h1>
+          <p>${esc(srow.primary_position ?? "")} · ${esc(srow.team)} · ${esc(srow.league.split("-")[1] ?? srow.league)}
+             · ${esc(srow.season)} · ${esc(srow.nationality ?? "")}${srow.age!=null ? " · age "+srow.age : ""}</p>
+        </div>
+      </div>
+      <div class="verdict">
+        <span class="chip" style="background:${m.verdict.color}">${m.verdict.chip}</span>
+        <small>${m.verdict.gap!=null
+          ? `output ${m.pct.non_penalty_goals_assists_per90} pct vs value ${m.pct.market_value_in_eur} pct · gap ${m.verdict.gap>0?"+":""}${m.verdict.gap}`
+          : ""}</small>
+      </div>
+      ${bar("npG+A /90", m.pct.non_penalty_goals_assists_per90, "var(--green)",
+            srow.non_penalty_goals_assists_per90?.toFixed(2))}
+      ${bar("Availability", m.pct.minutes, "var(--blue)",
+            Math.round(availability(srow)*100)+"%")}
+      ${bar("Start share", m.pct.start_share, "var(--blue)",
+            m.me.start_share!=null ? Math.round(m.me.start_share*100)+"%" : null)}
+      ${bar("Discipline", m.pct.discipline, "var(--chalk-y)",
+            m.me.cards90!=null ? m.me.cards90.toFixed(2)+"/90" : null)}
+      ${bar("Value €", m.pct.market_value_in_eur, "var(--amber)", eur(srow.market_value_in_eur))}
+      <div class="facts nums">
+        <div><label>Minutes</label><b>${(srow.minutes??0).toLocaleString("en")}</b></div>
+        <div><label>G + A</label><b>${srow.goals??0} + ${srow.assists??0}</b></div>
+        <div><label>Value</label><b>${eur(srow.market_value_in_eur)}${staleWarn}</b></div>
+        <div><label>npG+A/90</label><b>${srow.non_penalty_goals_assists_per90?.toFixed(2) ?? "—"}</b></div>
+        <div><label>Pens</label><b>${pens}</b></div>
+        <div><label>Peers</label><b>${m.pool.length} ${esc(srow.primary_position ?? "")}</b></div>
+      </div>
+      <div class="facts nums">
+        <div><label>Seasons</label><b>${seasons.length}</b></div>
+        <div><label>Clubs</label><b>${clubs}</b></div>
+        <div><label>Career G+A</label><b>${sum("goals")+sum("assists")}</b></div>
+      </div>
+      ${m.verdict.note ? `<p class="cardnote">${m.verdict.note}</p>` : ""}
+      <p class="cardnote">Percentiles vs same position, league and season, ≥${MIN_MINUTES} min. Peak value ${eur(peakVal||null)}.</p>
+    </div>
+
+    <div class="panel">
+      <div class="box">
+        <h2>Value vs output — ${esc(srow.season)} ${esc(srow.league.split("-")[0])} ${esc(srow.primary_position ?? "")}
+          <span class="plain">· hover any dot</span></h2>
+        <div class="chartbox">${scatter(m)}</div>
+        <p class="cap">Dashed diagonal = parity: production matches price. Above it = bargain zone,
+           below = premium zone. Amber dot = ${esc(srow.player_name)}.</p>
+      </div>
+      <div class="box">
+        <h2><span class="swatch" style="background:var(--blue)"></span>Minutes
+          <span class="swatch" style="background:var(--chalk-y)"></span>G+A /90
+          <span class="swatch" style="background:var(--green)"></span>npG+A /90
+          <span class="plain">· career trend, hover for values</span></h2>
+        <div class="chartbox">${trendChart(rows)}</div>
+      </div>
+    </div>
   </div>
+
   <section class="chart">
     <h2><span class="swatch" style="background:var(--amber)"></span>Market value by season
+      ${curve.length ? `<span class="swatch" style="background:var(--chalk-y)"></span>typical ${esc(srow.primary_position)} at his age` : ""}
       <span style="color:var(--muted);letter-spacing:0;text-transform:none">· dashed = transfer · dotted = club change</span></h2>
-    <div class="chartbox">${valueChart(rows, moves)}</div>
-  </section>
-  <section class="chart">
-    <h2><span class="swatch" style="background:var(--green)"></span>Goals + assists
-      <span class="swatch" style="background:var(--blue)"></span>Minutes
-      <span class="swatch" style="background:var(--chalk-y)"></span>G+A per 90
-      <span style="color:var(--muted);letter-spacing:0;text-transform:none">· lines show trend — hover for values</span></h2>
-    <div class="chartbox">${gaChart(rows)}</div>
+    <div class="chartbox">${valueChart(rows, moves, typical)}</div>
   </section>
   ${moves.length ? `
-  <div class="season-log">
+  <details class="season-log">
+    <summary>Transfers (source coverage is partial — big historic moves can be missing)</summary>
+    <div class="scroll">
     <table class="nums">
-      <caption>Transfers <span style="letter-spacing:0;text-transform:none">(source coverage is partial — big historic moves can be missing)</span></caption>
       <thead><tr><th>Date</th><th>From</th><th>To</th><th>Fee</th><th>Value then</th></tr></thead>
       <tbody>
       ${moves.slice().reverse().map(t=>`
@@ -259,10 +418,12 @@ function render(rows, moves = []){
         </tr>`).join("")}
       </tbody>
     </table>
-  </div>` : ""}
-  <div class="season-log">
+    </div>
+  </details>` : ""}
+  <details class="season-log">
+    <summary>Season log</summary>
+    <div class="scroll">
     <table class="nums">
-      <caption>Season log</caption>
       <thead><tr><th>Season</th><th>League</th><th>Team</th><th>Min</th>
         <th>G</th><th>A</th><th>G+A /90</th><th>Value</th></tr></thead>
       <tbody>
@@ -281,16 +442,61 @@ function render(rows, moves = []){
         </tr>`).join("")}
       </tbody>
     </table>
-  </div>`;
-  wireTooltips(rows);
+    </div>
+  </details>`;
+
+  document.getElementById("chips").addEventListener("click", e => {
+    const s = e.target.dataset?.s;
+    if(!s) return;
+    const u = new URL(location);
+    u.searchParams.set("s", s);
+    history.pushState({}, "", u);
+    load();
+  });
+  wireTooltips(rows, m, typical, srow.primary_position);
 }
 
-/* ---------- charts (shared x band scale) ---------- */
+/* ---------- value-vs-output scatter ---------- */
+function scatter(m){
+  const W=620, H=300, PL=44, PB=34, PT=14, PR=16;
+  const px = p => PL + (W-PL-PR)*p/100;
+  const py = p => H-PB - (H-PT-PB)*p/100;
+  if(m.pool.length < 8 || !m.attacker)
+    return `<svg viewBox="0 0 ${W} ${H}"><text x="${W/2}" y="${H/2}" text-anchor="middle"
+      fill="var(--muted)" font-size="14">${m.attacker ? "peer pool too small to rank" :
+      "attacking-output ranking doesn't apply to this position"}</text></svg>`;
+  const vPct = pctsOf(m.pool, "market_value_in_eur");
+  const oPct = pctsOf(m.pool, "non_penalty_goals_assists_per90");
+  const dots = m.pool.map((p,i)=>{
+    const x = vPct(p.market_value_in_eur), y = oPct(p.non_penalty_goals_assists_per90);
+    if(x==null||y==null) return "";
+    return `<circle data-p="${i}" cx="${px(x).toFixed(1)}" cy="${py(y).toFixed(1)}" r="4.5"
+      fill="rgba(242,245,239,.30)"/>`;
+  }).join("");
+  const mx = m.pct.market_value_in_eur, my = m.pct.non_penalty_goals_assists_per90;
+  const me = (mx!=null && my!=null) ?
+    `<circle cx="${px(mx)}" cy="${py(my)}" r="8" fill="var(--amber)" stroke="var(--card)" stroke-width="2"/>` : "";
+  return `<svg viewBox="0 0 ${W} ${H}" id="schart" aria-label="Market value percentile vs output percentile among positional peers">
+    <line x1="${PL}" y1="${py(0)}" x2="${px(100)}" y2="${py(100)}"
+      stroke="var(--chalk-y)" stroke-opacity=".5" stroke-dasharray="5 5"/>
+    <text x="${PL+8}" y="${PT+12}" fill="var(--axis)" font-size="11">bargain zone</text>
+    <text x="${px(100)-104}" y="${py(0)-8}" fill="var(--axis)" font-size="11">premium zone</text>
+    ${dots}${me}
+    <line x1="${PL}" x2="${W-PR}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
+    <line x1="${PL}" x2="${PL}" y1="${PT}" y2="${H-PB}" stroke="var(--axis)"/>
+    <text x="${PL}" y="${H-8}" fill="var(--axis)" font-size="11">market value percentile →</text>
+    <text x="12" y="${H-PB}" fill="var(--axis)" font-size="11"
+      transform="rotate(-90 12 ${H-PB})">npG+A/90 percentile →</text>
+  </svg>`;
+}
+
+/* ---------- career charts (shared x band scale) ---------- */
 const W=720, PAD_L=52, PAD_R=14;
 const bandX = (rows,i) => PAD_L + (W-PAD_L-PAD_R) * (i + .5) / rows.length;
 
-function valueChart(rows, moves = []){
+function valueChart(rows, moves = [], typical = {}){
   const H=210, PT=14, PB=26;
+  const typVals = rows.map(r=>r.age!=null ? typical[r.age] ?? null : null);
   const seasonIdx = Object.fromEntries(rows.map((r,i)=>[r.season,i]));
   const recorded = new Set(moves.map(t=>seasonIdx[moveSeason(t.transfer_date)])
                                 .filter(i=>i!=null));
@@ -320,8 +526,16 @@ function valueChart(rows, moves = []){
       <title>${s}: ${[...prev.teams].join("/")} → ${[...cur.teams].join("/")} (no transfer record)</title></line>`;
   }).join("");
   const vals = rows.map(r=>r.market_value_in_eur);
-  const max = Math.max(...vals.filter(v=>v!=null), 1);
+  // same € axis for both series — include the curve so it never clips
+  const max = Math.max(...vals.filter(v=>v!=null), ...typVals.filter(v=>v!=null), 1);
   const y = v => PT + (H-PT-PB) * (1 - v/max);
+  const typPts = typVals.map((v,i)=>v==null?null:[bandX(rows,i),y(v)]);
+  const typSeg=[]; let typRun=[];
+  for(const p of typPts){ if(p) typRun.push(p); else {if(typRun.length>1)typSeg.push(typRun); typRun=[];} }
+  if(typRun.length>1) typSeg.push(typRun);
+  const typLine = typSeg.map(s=>`<path fill="none" stroke="var(--chalk-y)" stroke-width="2"
+    stroke-dasharray="6 4" opacity=".8"
+    d="M${s.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")}"/>`).join("");
   const pts = rows.map((r,i)=>vals[i]==null?null:[bandX(rows,i),y(vals[i])]);
   const seg=[]; let run=[];
   for(const p of pts){ if(p) run.push(p); else {if(run.length)seg.push(run); run=[];} }
@@ -337,6 +551,7 @@ function valueChart(rows, moves = []){
     <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
     ${vlines}${synth}
     <path d="${area}" fill="var(--amber)" opacity=".14"/>
+    ${typLine}
     <path d="${line}" fill="none" stroke="var(--amber)" stroke-width="2"/>
     ${pts.map((p,i)=>p?`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="var(--amber)"
         stroke="var(--card)" stroke-width="2"/>`:"").join("")}
@@ -346,20 +561,10 @@ function valueChart(rows, moves = []){
   </svg>`;
 }
 
-function gaChart(rows){
-  const H=170, PT=14, PB=26;
-  const ga = rows.map(r=>(r.goals||0)+(r.assists||0));
-  const max = Math.max(...ga,1);
-  const bw = Math.min(26,(W-PAD_L-PAD_R)/rows.length-2);
-  const bars = rows.map((r,i)=>{
-    const h = (H-PT-PB)*ga[i]/max, x = bandX(rows,i)-bw/2, yy = H-PB-h;
-    return `<rect data-i="${i}" x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}"
-        height="${Math.max(h,1).toFixed(1)}" rx="3" fill="var(--green)"/>`}).join("");
-  const top = ga.indexOf(Math.max(...ga));
-
-  // overlay trend lines: shape-fitted to panel height (axis stays G+A counts;
-  // raw minutes would flatten the bars), true values live in the tooltip
-  const overlay = (vals, color) => {
+// three shape-fitted lines (units differ — no shared axis; real values in tooltip)
+function trendChart(rows){
+  const H=150, PT=12, PB=24;
+  const line = (vals, color) => {
     const vmax = Math.max(...vals.filter(v=>v!=null), 1e-9);
     const pts = vals.map((v,i)=>v==null?null:
       [bandX(rows,i), H-PB-(H-PT-PB)*.92*(v/vmax)]);
@@ -369,17 +574,14 @@ function gaChart(rows){
     return seg.map(s=>`<path fill="none" stroke="${color}" stroke-width="2"
       d="M${s.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")}"/>`).join("");
   };
-  const minLine = overlay(rows.map(r=>r.minutes), "var(--blue)");
-  const p90Line = overlay(rows.map(r=>r.goals_assists_per90), "var(--chalk-y)");
-
-  return `<svg viewBox="0 0 ${W} ${H}" id="gchart" aria-label="Goals plus assists by season, with minutes and per-90 trend lines">
+  return `<svg viewBox="0 0 ${W} ${H}" id="tchart" aria-label="Career trend: minutes, goals plus assists per 90, and non-penalty goals plus assists per 90">
     <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
-    <text x="${PAD_L-6}" y="${PT+8}" text-anchor="end" font-size="11" fill="var(--axis)">${max}</text>
-    ${bars}
-    ${minLine}${p90Line}
-    <text x="${bandX(rows,top)}" y="${Math.max(H-PB-(H-PT-PB)*ga[top]/max-6, 11)}"
-        text-anchor="middle" font-size="11" fill="var(--line)">${ga[top]}</text>
+    ${line(rows.map(r=>r.minutes), "var(--blue)")}
+    ${line(rows.map(r=>r.goals_assists_per90), "var(--chalk-y)")}
+    ${line(rows.map(r=>r.non_penalty_goals_assists_per90), "var(--green)")}
     ${xAxis(rows,H,PB)}
+    <line id="tcross" y1="${PT}" y2="${H-PB}" stroke="var(--axis)" stroke-dasharray="3 3"
+        visibility="hidden"/>
   </svg>`;
 }
 
@@ -391,12 +593,23 @@ function xAxis(rows,H,PB){
 }
 
 /* ---------- hover layer ---------- */
-function wireTooltips(rows){
+function wireTooltips(rows, m, typical = {}, pos = ""){
   const tip = document.getElementById("tip");
   const show = (e,html) => { tip.innerHTML = html; tip.style.display = "block";
     tip.style.left = Math.min(e.clientX+14, innerWidth-190)+"px";
     tip.style.top = (e.clientY+14)+"px"; };
   const hide = () => tip.style.display = "none";
+
+  const s = document.getElementById("schart");
+  if(s) s.addEventListener("mousemove", e => {
+    const c = e.target.closest("circle[data-p]");
+    if(!c){ hide(); return; }
+    const p = m.pool[+c.dataset.p];
+    show(e, `<div class="t">${esc(p.player_name)} · ${esc(p.team)}</div>
+      ${p.non_penalty_goals_assists_per90?.toFixed(2) ?? "—"} npG+A/90 · ${eur(p.market_value_in_eur)}
+      · ${p.minutes} min`);
+  });
+  if(s) s.addEventListener("mouseleave", hide);
 
   const v = document.getElementById("vchart"), cross = document.getElementById("vcross");
   const idxFromEvent = (svg,e) => {
@@ -409,20 +622,26 @@ function wireTooltips(rows){
     const i = idxFromEvent(v,e), r = rows[i];
     cross.setAttribute("x1",bandX(rows,i)); cross.setAttribute("x2",bandX(rows,i));
     cross.setAttribute("visibility","visible");
+    const typ = r.age!=null ? typical[r.age] : null;
     show(e, `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
-      ${eur(r.market_value_in_eur)}${r.value_is_stale?" ⚠":""}`);
+      ${eur(r.market_value_in_eur)}${r.value_is_stale?" ⚠":""}${typ!=null
+        ? `<br>typical ${esc(pos)} at ${r.age}: ${eur(typ)}` : ""}`);
   });
   v.addEventListener("mouseleave", () => { hide(); cross.setAttribute("visibility","hidden"); });
 
-  const g = document.getElementById("gchart");
-  g.addEventListener("mousemove", e => {
-    const i = idxFromEvent(g,e), r = rows[i];
+  const t = document.getElementById("tchart"), tc = document.getElementById("tcross");
+  t.addEventListener("mousemove", e => {
+    const i = idxFromEvent(t,e), r = rows[i];
+    tc.setAttribute("x1",bandX(rows,i)); tc.setAttribute("x2",bandX(rows,i));
+    tc.setAttribute("visibility","visible");
     show(e, `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
-      ${(r.goals||0)} goals · ${(r.assists||0)} assists<br>
-      ${r.minutes||0} min · ${r.goals_assists_per90 != null
-        ? r.goals_assists_per90.toFixed(2)+" G+A/90" : "rate n/a (<450 min)"}`);
+      ${r.minutes||0} min · ${(r.goals||0)}G ${(r.assists||0)}A<br>
+      ${r.goals_assists_per90 != null
+        ? r.goals_assists_per90.toFixed(2)+" G+A/90 · "+
+          (r.non_penalty_goals_assists_per90?.toFixed(2) ?? "—")+" npG+A/90"
+        : "rates n/a (<450 min)"}`);
   });
-  g.addEventListener("mouseleave", hide);
+  t.addEventListener("mouseleave", () => { hide(); tc.setAttribute("visibility","hidden"); });
 }
 </script>
 </body>

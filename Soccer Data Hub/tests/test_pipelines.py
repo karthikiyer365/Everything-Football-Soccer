@@ -114,8 +114,43 @@ def test_push_transfers_upserts_on_composite_key(monkeypatch, tmp_path):
     assert captured["key"] == "tm_id,transfer_date"
 
 
+def test_push_age_curve_groups_and_filters(monkeypatch):
+    import pandas as pd
+
+    import soccerhub.pipelines as pl
+
+    hub = pd.DataFrame({
+        "primary_position": ["FW"]*3 + ["MF"]*2 + [None],
+        "age": [23, 23, 23, 30, 30, 23],
+        "market_value_in_eur": [10e6, 20e6, None, 5e6, 7e6, 9e6],
+        "minutes": [900, 900, 900, 900, 100, 900],
+    })
+    monkeypatch.setattr("soccerhub.pipelines.query.read_hub",
+                        lambda table, select: hub)
+
+    captured = {}
+
+    def fake_upsert(df, table, on_conflict):
+        captured["df"], captured["table"], captured["key"] = df, table, on_conflict
+        return len(df)
+
+    import soccerhub.pipelines.supa as sp
+    monkeypatch.setattr(sp, "upsert_df", fake_upsert)
+
+    # min_n=2: FW/23 survives (two valued rows -> avg 15m); MF/30 has one row
+    # over the minutes floor -> dropped; None position dropped
+    assert pl.push_age_curve(min_minutes=450, min_n=2) == 1
+    row = captured["df"].iloc[0]
+    assert captured["table"] == "age_curve"
+    assert captured["key"] == "primary_position,age"
+    assert (row["primary_position"], row["age"]) == ("FW", 23)
+    assert row["avg_value_eur"] == 15_000_000
+    assert row["n"] == 2
+
+
 def test_public_exports():
     import soccerhub
     for fn in ("build_player_xref", "build_player_season",
-               "push_to_supabase", "push_transfers", "run_season"):
+               "push_to_supabase", "push_transfers", "push_age_curve",
+               "run_season"):
         assert callable(getattr(soccerhub, fn))
