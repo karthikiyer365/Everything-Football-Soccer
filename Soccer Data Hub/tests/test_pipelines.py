@@ -217,9 +217,50 @@ def test_push_club_elo_filters_to_big5(monkeypatch, tmp_path):
     assert list(captured["df"]["team"]) == ["Man City"]
 
 
+def test_push_club_elo_history_maps_league_and_drops_lower_divisions(
+        monkeypatch, tmp_path):
+    import pandas as pd
+
+    import soccerhub.pipelines as pl
+    from soccerhub.manifest import Manifest
+
+    hdf = pd.DataFrame({
+        "team": ["Leicester"]*3,
+        "country": ["ENG"]*3,
+        "level": [1, 2, 1],  # level 2 = Championship spell: dropped, not mislabeled
+        "elo": [1700.0, 1600.0, 1750.0],
+        "elo_from": ["2015-08-01", "2023-08-01", "2024-08-01"],
+        "elo_to": ["2015-08-08", "2023-08-08", "2024-08-08"],
+        "snapshot_date": ["2015-08-01", "2023-08-01", "2024-08-01"],
+    })
+    p = tmp_path / "h.parquet"
+    hdf.to_parquet(p)
+    fake_manifest = Manifest(path=str(p), source="clubelo", dataset="history",
+                             params={}, rows=3, cols=7, date_range=None, fetched_at="t")
+
+    monkeypatch.setattr("soccerhub.readers.clubelo.fetch_club_elo_history",
+                        lambda team, force=False: fake_manifest)
+
+    captured = {}
+
+    def fake_upsert(df, table, on_conflict):
+        captured["df"], captured["table"], captured["key"] = df, table, on_conflict
+        return len(df)
+
+    import soccerhub.pipelines.supa as sp
+    monkeypatch.setattr(sp, "upsert_df", fake_upsert)
+
+    assert pl.push_club_elo_history("Leicester") == 2
+    assert captured["table"] == "club_elo"
+    assert captured["key"] == "team,league,snapshot_date"
+    assert set(captured["df"]["league"]) == {"ENG-Premier League"}
+    assert 1600.0 not in set(captured["df"]["elo"])
+
+
 def test_public_exports():
     import soccerhub
     for fn in ("build_player_xref", "build_player_season",
                "push_to_supabase", "push_transfers", "push_age_curve",
-               "push_matches", "push_club_elo", "run_season"):
+               "push_matches", "push_club_elo", "push_club_elo_history",
+               "run_season"):
         assert callable(getattr(soccerhub, fn))

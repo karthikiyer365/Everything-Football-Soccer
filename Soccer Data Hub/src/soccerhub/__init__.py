@@ -2,7 +2,7 @@
 
 from soccerhub.errors import SoccerhubError
 from soccerhub.manifest import Manifest
-from soccerhub.readers.clubelo import fetch_club_elo_snapshot
+from soccerhub.readers.clubelo import fetch_club_elo_history, fetch_club_elo_snapshot
 from soccerhub.readers.fbref import fetch_fbref_season
 from soccerhub.readers.matchhistory import fetch_match_history
 from soccerhub.readers.statsbomb import fetch_statsbomb_events
@@ -16,6 +16,7 @@ from soccerhub.pipelines import (
     build_player_xref,
     push_age_curve,
     push_club_elo,
+    push_club_elo_history,
     push_matches,
     push_to_supabase,
     push_transfers,
@@ -26,6 +27,7 @@ from soccerhub.pipelines import (
 __all__ = [
     "SoccerhubError",
     "Manifest",
+    "fetch_club_elo_history",
     "fetch_club_elo_snapshot",
     "fetch_fbref_season",
     "fetch_match_history",
@@ -40,6 +42,7 @@ __all__ = [
     "push_age_curve",
     "push_matches",
     "push_club_elo",
+    "push_club_elo_history",
     "read_hub",
     "run_season",
 ]

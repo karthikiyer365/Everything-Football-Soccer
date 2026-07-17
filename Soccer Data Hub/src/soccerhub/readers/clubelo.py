@@ -27,3 +27,22 @@ def fetch_club_elo_snapshot(date: str | None = None, force: bool = False) -> Man
         return df
 
     return cached_fetch("clubelo", "snapshot", {"date": d}, produce, force)
+
+
+def fetch_club_elo_history(team: str, since: str = "2008-01-01",
+                           force: bool = False) -> Manifest:
+    """Full Elo time series for one club: one row per rating change."""
+
+    def produce():
+        df = sd.ClubElo().read_team_history(team).reset_index()
+        df = df[df["from"] >= since]
+        df = df.rename(columns={"from": "elo_from", "to": "elo_to"})
+        df["elo_from"] = df["elo_from"].dt.strftime("%Y-%m-%d")
+        df["elo_to"] = df["elo_to"].dt.strftime("%Y-%m-%d")
+        # each rating becomes a snapshot dated at the start of its validity
+        df["snapshot_date"] = df["elo_from"]
+        return df
+
+    return cached_fetch(
+        "clubelo", "history", {"team": team, "since": since}, produce, force
+    )
