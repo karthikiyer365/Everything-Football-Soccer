@@ -148,9 +148,78 @@ def test_push_age_curve_groups_and_filters(monkeypatch):
     assert row["n"] == 2
 
 
+def test_push_matches_builds_and_upserts(monkeypatch, tmp_path):
+    import pandas as pd
+
+    import soccerhub.pipelines as pl
+    from soccerhub.manifest import Manifest
+
+    mdf = pd.DataFrame({
+        "league": ["ENG-Premier League"], "season": ["2023"],
+        "date": ["2023-08-11"], "home_team": ["Burnley"], "away_team": ["Man City"],
+        "home_goals": [0], "away_goals": [3], "result": ["A"],
+    })
+    p = tmp_path / "m.parquet"
+    mdf.to_parquet(p)
+    fake_manifest = Manifest(path=str(p), source="hub", dataset="matches",
+                             params={}, rows=1, cols=7, date_range=None, fetched_at="t")
+
+    monkeypatch.setattr("soccerhub.pipelines.matches.build_matches",
+                        lambda l, s, force=False, refetch=False: fake_manifest)
+
+    captured = {}
+
+    def fake_upsert(df, table, on_conflict):
+        captured["table"], captured["key"] = table, on_conflict
+        return len(df)
+
+    import soccerhub.pipelines.supa as sp
+    monkeypatch.setattr(sp, "upsert_df", fake_upsert)
+
+    assert pl.push_matches("ENG-Premier League", "2023") == 1
+    assert captured["table"] == "matches"
+    assert captured["key"] == "league,season,date,home_team,away_team"
+
+
+def test_push_club_elo_filters_to_big5(monkeypatch, tmp_path):
+    import pandas as pd
+
+    import soccerhub.pipelines as pl
+    from soccerhub.manifest import Manifest
+
+    edf = pd.DataFrame({
+        "team": ["Man City", "River Plate"],
+        "league": ["ENG-Premier League", "ARG-Primera Division"],
+        "snapshot_date": ["2023-08-11", "2023-08-11"],
+        "elo": [2077.3, 1900.0],
+    })
+    p = tmp_path / "e.parquet"
+    edf.to_parquet(p)
+    fake_manifest = Manifest(path=str(p), source="clubelo", dataset="snapshot",
+                             params={}, rows=2, cols=4, date_range=None, fetched_at="t")
+
+    monkeypatch.setattr("soccerhub.readers.clubelo.fetch_club_elo_snapshot",
+                        lambda date, force=False: fake_manifest)
+
+    captured = {}
+
+    def fake_upsert(df, table, on_conflict):
+        captured["df"], captured["table"], captured["key"] = df, table, on_conflict
+        return len(df)
+
+    import soccerhub.pipelines.supa as sp
+    monkeypatch.setattr(sp, "upsert_df", fake_upsert)
+
+    n = pl.push_club_elo("2023-08-11")
+    assert n == 1  # River Plate (non-Big5) filtered out
+    assert captured["table"] == "club_elo"
+    assert captured["key"] == "team,league,snapshot_date"
+    assert list(captured["df"]["team"]) == ["Man City"]
+
+
 def test_public_exports():
     import soccerhub
     for fn in ("build_player_xref", "build_player_season",
                "push_to_supabase", "push_transfers", "push_age_curve",
-               "run_season"):
+               "push_matches", "push_club_elo", "run_season"):
         assert callable(getattr(soccerhub, fn))
