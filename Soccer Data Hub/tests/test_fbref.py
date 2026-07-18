@@ -20,13 +20,19 @@ def test_fetch_passes_unambiguous_code(tmp_path, monkeypatch):
     class FakeFBref:
         def __init__(self, leagues, seasons):
             captured["seasons"] = seasons
-        def read_player_season_stats(self):
+        def read_player_season_stats(self, stat_type="standard"):
+            captured["stat_type"] = stat_type
             return pd.DataFrame({"x": [1]})
 
     monkeypatch.setattr(fb.sd, "FBref", FakeFBref)
     m = fb.fetch_fbref_season("ENG-Premier League", "2021")
     assert captured["seasons"] == "2122"
+    assert captured["stat_type"] == "standard"
     assert m.params["season"] == "2021"  # canonical label unchanged in cache key
+    m2 = fb.fetch_fbref_season("ENG-Premier League", "2021", stat_type="misc")
+    assert captured["stat_type"] == "misc"
+    assert m2.params.get("stat_type") == "misc"  # separate cache key
+    assert "stat_type" not in m.params  # legacy standard keys untouched
 
 
 def test_patch_league_config_writes_serie_a_fix(tmp_path, monkeypatch):
@@ -52,7 +58,7 @@ def test_fetch_fbref_season_caches_reader_output(monkeypatch):
             self.leagues = leagues
             self.seasons = seasons
 
-        def read_player_season_stats(self):
+        def read_player_season_stats(self, stat_type="standard"):
             return pd.DataFrame({"player": ["A", "B"], "goals": [3, 1]})
 
     monkeypatch.setattr(fbref.sd, "FBref", FakeFBref)
