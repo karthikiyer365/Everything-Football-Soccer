@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Match Center — SoccerHub</title>
+<meta name="description" content="The round-by-round race and long-run club strength across Europe's big five leagues, 2008 to today.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<style>
+  :root{
+    --grass:#122b1a; --grass-lt:#16321f; --card:#0a1a0e;
+    --line:#f2f5ef; --muted:#9fb69c; --tag:#8fae8b; --border:rgba(242,245,239,.22);
+    --amber:#ffb43a; --green:#8fd18a; --chalk-y:#e8d47a; --blue:#5aa9f0;
+    --red:#e0524a; --grid:rgba(242,245,239,.10); --axis:rgba(242,245,239,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:
+       repeating-linear-gradient(0deg,var(--grass) 0 72px,var(--grass-lt) 72px 144px);
+       color:var(--line);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+       min-height:100vh}
+  .disp{font-family:"Avenir Next Condensed","Arial Narrow","Helvetica Neue Condensed",Impact,sans-serif;
+        text-transform:uppercase;letter-spacing:.04em;font-stretch:condensed}
+  .nums{font-variant-numeric:tabular-nums}
+  a{color:var(--chalk-y)}
+
+  .top{position:sticky;top:0;z-index:5;display:flex;gap:16px;align-items:center;
+       padding:12px 20px;background:rgba(5,14,8,.92);backdrop-filter:blur(4px);
+       border-bottom:1px solid var(--border)}
+  .top a.home{color:var(--line);text-decoration:none;font-size:1.05rem;white-space:nowrap}
+  .top h1{margin:0;font-size:1.05rem;color:var(--muted);font-weight:400}
+
+  main{max-width:1060px;margin:0 auto;padding:24px 20px 80px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+  .chips button{border:1px solid var(--border);background:var(--card);color:var(--muted);
+       border-radius:999px;padding:4px 12px;font:inherit;font-size:.8rem;cursor:pointer}
+  .chips button[aria-pressed="true"]{background:var(--amber);color:#20160a;
+       border-color:var(--amber);font-weight:700}
+  .chips button:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+
+  /* team picker */
+  .picker{position:relative;margin:6px 0 0}
+  .picker .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  #teamsearch{width:260px;padding:8px 14px;border-radius:999px;border:1px solid var(--border);
+       background:var(--card);color:var(--line);font:inherit;font-size:.9rem}
+  #teamsearch::placeholder{color:var(--tag)}
+  #teamsearch:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+  #teamlist{position:absolute;top:110%;left:0;width:280px;background:var(--card);z-index:6;
+       border:1px solid var(--border);border-radius:6px;overflow:hidden auto;display:none;
+       max-height:280px}
+  #teamlist button{display:block;width:100%;padding:8px 14px;border:0;background:none;
+       color:var(--line);font:inherit;font-size:.88rem;text-align:left;cursor:pointer}
+  #teamlist button:hover,#teamlist button:focus-visible{background:rgba(255,180,58,.12);outline:none}
+  #teamlist button[disabled]{color:var(--muted);cursor:default}
+  .selchip{display:inline-flex;align-items:center;gap:7px;border-radius:999px;
+       padding:4px 8px 4px 12px;font-size:.82rem;font-weight:700;color:#0e2413}
+  .selchip button{border:0;background:rgba(14,36,19,.25);color:#0e2413;border-radius:50%;
+       width:17px;height:17px;line-height:1;font-size:11px;cursor:pointer;font-weight:800}
+
+  .box{background:var(--card);border:1px solid var(--border);border-radius:6px;
+       padding:16px;margin-top:14px}
+  .box h2{margin:0 0 8px;font-size:.8rem;letter-spacing:.16em;
+        text-transform:uppercase;color:var(--tag);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .box h2 .plain{color:var(--muted);letter-spacing:0;text-transform:none}
+  .box p.cap{margin:8px 0 0;font-size:12px;color:var(--muted)}
+  .swatch{width:10px;height:10px;border-radius:2px;display:inline-block}
+  .chartbox{position:relative}
+  .chartbox svg{width:100%;height:auto;display:block}
+  svg text{font:11px system-ui;fill:var(--axis)}
+  .empty{color:var(--muted);text-align:center;padding:50px 16px}
+
+  /* per-team stat cards under the long-run chart */
+  .statcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+       gap:12px;margin-top:12px;border-top:1px solid rgba(242,245,239,.1);padding-top:12px}
+  .statcard{border-left:3px solid var(--border);padding:2px 0 2px 12px;font-size:.82rem}
+  .statcard .t{font-weight:700;font-size:.9rem}
+  .statcard .l{color:var(--muted)}
+
+  #tip{position:fixed;z-index:9;pointer-events:none;display:none;background:#050e08;
+       border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-size:.8rem;
+       color:var(--line);box-shadow:0 4px 16px rgba(0,0,0,.5)}
+  #tip .t{color:var(--tag);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<nav class="top">
+  <a class="home disp" href="index.html">⚽ SoccerHub</a>
+  <h1>Match Center</h1>
+</nav>
+
+<main>
+  <div class="chips" id="lgchips"></div>
+  <div class="chips nums" id="sschips"></div>
+  <div class="picker">
+    <div class="row">
+      <input id="teamsearch" type="search" placeholder="Add team — search…"
+             autocomplete="off" aria-label="Search and add teams">
+      <span id="selchips"></span>
+    </div>
+    <div id="teamlist" role="listbox"></div>
+  </div>
+
+  <div class="box">
+    <h2>The race <span class="plain" id="racemeta"></span></h2>
+    <div class="chartbox" id="bump"><div class="empty">Loading…</div></div>
+    <p class="cap">League position after every round, from match results. Faint = the rest
+       of the league; click any line to add that team. Right margin shows each
+       selected team's final position, last-5 form and points.</p>
+  </div>
+
+  <div class="box">
+    <h2>Long-run strength <span class="plain">· club Elo 2008→now ·
+      <span class="swatch" style="background:var(--chalk-y)"></span>league median (dashed)</span></h2>
+    <div class="chartbox" id="longrun"><div class="empty">Add teams to compare.</div></div>
+    <div class="statcards nums" id="elostats"></div>
+    <p class="cap">Full Elo series per club against the league's median club. All-time
+       aggregates cover 2008→now in this league.</p>
+  </div>
+</main>
+<div id="tip" role="status"></div>
+
+<script>
+const SUPABASE_URL = "https://rgnzemkdldohplwbxxwy.supabase.co";
+const ANON_KEY = "sb_publishable_Qy0bJ4CdrxffuJGNq12ebw_r0-Z3qD-";
+const LEAGUES = ["ENG-Premier League","ESP-La Liga","GER-Bundesliga",
+                 "ITA-Serie A","FRA-Ligue 1"];
+const SEASONS = Array.from({length: 18}, (_,i)=>String(2008+i));
+// fixed categorical order — a team keeps its color while selected
+const SEL_COLORS = ["var(--amber)","var(--blue)","var(--green)","var(--red)","var(--chalk-y)"];
+const MAX_SEL = SEL_COLORS.length;
+
+// football-data team name -> ClubElo team name, where they differ
+// (interim seam until a club_xref table exists — see TOPICAL_MAP)
+const ELO_ALIAS = {
+  "Bayern Munich":"Bayern","Ath Madrid":"Atletico","Ath Bilbao":"Bilbao",
+  "Espanol":"Espanyol","Ein Frankfurt":"Frankfurt","FC Koln":"Koeln",
+  "M'gladbach":"Gladbach","Nott'm Forest":"Forest","Nurnberg":"Nuernberg",
+  "Sp Gijon":"Gijon","La Coruna":"Depor","Kaiserslautern":"Lautern",
+  "Fortuna Dusseldorf":"Duesseldorf","Greuther Furth":"Fuerth",
+  "Holstein Kiel":"Holstein","Evian Thonon Gaillard":"Evian TG",
+  "Ajaccio GFCO":"Gazelec","St Etienne":"Saint-Etienne","Werder Bremen":"Werder",
+  "Vallecano":"Rayo Vallecano",
+};
+
+async function hub(table, params){
+  const q = new URLSearchParams(params);
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${q}`,
+                        {headers:{apikey: ANON_KEY}});
+  if(!r.ok) throw new Error(`${table}: ${r.status}`);
+  return r.json();
+}
+// Supabase clamps every request to 1000 rows no matter the limit param —
+// long Elo series (~1700 rows) silently truncate without this loop
+async function hubAll(table, params){
+  const PAGE = 1000;
+  const rows = [];
+  for(let offset = 0;; offset += PAGE){
+    const page = await hub(table, {...params, limit: String(PAGE), offset: String(offset)});
+    rows.push(...page);
+    if(page.length < PAGE) return rows;
+  }
+}
+const esc = s => String(s).replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const tipEl = () => document.getElementById("tip");
+const showTip = (e, html) => { const t=tipEl(); t.innerHTML=html; t.style.display="block";
+  t.style.left=Math.min(e.clientX+14, innerWidth-200)+"px"; t.style.top=(e.clientY+14)+"px"; };
+const hideTip = () => tipEl().style.display="none";
+
+/* ---------- state via URL ---------- */
+const state = () => {
+  const u = new URLSearchParams(location.search);
+  return {
+    lg: LEAGUES.includes(u.get("lg")) ? u.get("lg") : LEAGUES[0],
+    ss: SEASONS.includes(u.get("s")) ? u.get("s") : SEASONS[SEASONS.length-1],
+    teams: (u.get("teams") || "").split(",").filter(Boolean).slice(0, MAX_SEL),
+  };
+};
+function setState(patch){
+  const cur = {...state(), ...patch};
+  const u = new URL(location);
+  u.search = `?lg=${encodeURIComponent(cur.lg)}&s=${cur.ss}` +
+             (cur.teams.length ? `&teams=${cur.teams.map(encodeURIComponent).join(",")}` : "");
+  history.pushState({}, "", u);
+  load();
+}
+window.addEventListener("popstate", load);
+const colorOf = team => {
+  const i = state().teams.indexOf(team);
+  return i === -1 ? null : SEL_COLORS[i];
+};
+const toggleTeam = t => {
+  const cur = state().teams;
+  setState({teams: cur.includes(t) ? cur.filter(x=>x!==t)
+                  : cur.length < MAX_SEL ? [...cur, t] : cur});
+};
+
+/* ---------- rank + form from matches ---------- */
+function roundRanks(matches){
+  const nTeams = new Set(matches.flatMap(m=>[m.home_team, m.away_team])).size;
+  const perRound = Math.max(1, Math.floor(nTeams/2));
+  const pts = {}, hist = {}, form = {};
+  matches.forEach((m, idx) => {
+    for(const t of [m.home_team, m.away_team]){ pts[t] ??= 0; hist[t] ??= []; form[t] ??= []; }
+    if(m.result === "H"){ pts[m.home_team]+=3; form[m.home_team].push("W"); form[m.away_team].push("L"); }
+    else if(m.result === "A"){ pts[m.away_team]+=3; form[m.away_team].push("W"); form[m.home_team].push("L"); }
+    else { pts[m.home_team]++; pts[m.away_team]++; form[m.home_team].push("D"); form[m.away_team].push("D"); }
+    if(idx % perRound === perRound-1){
+      const order = Object.entries(pts).sort((a,b)=>b[1]-a[1]).map(([t])=>t);
+      order.forEach((t,i)=>hist[t].push(i+1));
+    }
+  });
+  return {hist, pts, form};
+}
+
+let matches = [];
+
+/* ---------- team picker ---------- */
+function renderPicker(){
+  const {teams} = state();
+  const names = [...new Set(matches.flatMap(m=>[m.home_team, m.away_team]))].sort();
+  document.getElementById("selchips").innerHTML = teams.map((t,i)=>
+    `<span class="selchip" style="background:${SEL_COLORS[i]}">
+       ${esc(t)}<button data-rm="${esc(t)}" aria-label="remove ${esc(t)}">×</button></span>`).join(" ");
+  const input = document.getElementById("teamsearch");
+  const list = document.getElementById("teamlist");
+  const fill = () => {
+    const q = input.value.trim().toLowerCase();
+    const hits = names.filter(n=>n.toLowerCase().includes(q));
+    list.innerHTML = hits.length ? hits.map(n=>{
+      const on = teams.includes(n);
+      const full = !on && teams.length >= MAX_SEL;
+      return `<button data-add="${esc(n)}" ${full?"disabled":""}>
+        ${on ? "✓ " : ""}${esc(n)}${full ? " (max 5)" : ""}</button>`;
+    }).join("") : `<button disabled>No teams match</button>`;
+    list.style.display = "block";
+  };
+  input.oninput = fill;
+  input.onfocus = fill;
+}
+document.addEventListener("click", e=>{
+  const rm = e.target.closest("[data-rm]");
+  if(rm){ toggleTeam(rm.dataset.rm); return; }
+  const add = e.target.closest("#teamlist [data-add]");
+  if(add){
+    toggleTeam(add.dataset.add);
+    document.getElementById("teamsearch").value = "";
+    return;
+  }
+  if(!e.target.closest(".picker"))
+    document.getElementById("teamlist").style.display = "none";
+});
+
+/* ---------- load ---------- */
+async function load(){
+  const {lg, ss} = state();
+  document.getElementById("lgchips").innerHTML = LEAGUES.map(l=>
+    `<button data-lg="${esc(l)}" aria-pressed="${l===lg}">${esc(l.split("-")[1])}</button>`).join("");
+  document.getElementById("sschips").innerHTML = SEASONS.map(s=>
+    `<button data-ss="${s}" aria-pressed="${s===ss}">${s}</button>`).join("");
+  try{
+    matches = await hub("matches",
+      {select: "*", league: `eq.${lg}`, season: `eq.${ss}`, order: "date", limit: "1000"});
+  }catch(e){
+    document.getElementById("bump").innerHTML =
+      `<div class="empty">Could not reach the database (${esc(e.message)}).</div>`;
+    return;
+  }
+  document.getElementById("racemeta").textContent =
+    `· ${lg.split("-")[1]} ${ss}/${String(+ss+1).slice(2)} · ${matches.length} matches`;
+  renderPicker();
+  renderBump();
+  renderLongrun();
+}
+
+/* ---------- chart 1: rank bump + form legend ---------- */
+function renderBump(){
+  const el = document.getElementById("bump");
+  if(!matches.length){ el.innerHTML = `<div class="empty">No matches.</div>`; return; }
+  const {hist, pts, form} = roundRanks(matches);
+  const all = Object.keys(hist), R = hist[all[0]]?.length ?? 0;
+  if(R < 2){ el.innerHTML = `<div class="empty">Season too young to race.</div>`; return; }
+  const W=1000,H=380,PL=28,PR=250,PT=12,PB=22;
+  const x=i=>PL+(W-PL-PR)*i/(R-1), y=r=>PT+(H-PT-PB)*(r-1)/(all.length-1);
+  const lines = all.map(t=>{
+    const c = colorOf(t);
+    return `<path fill="none" stroke="${c ?? "rgba(242,245,239,.15)"}"
+      stroke-width="${c?2.5:1.5}" data-team="${esc(t)}" style="cursor:pointer"
+      d="M${hist[t].map((r,i)=>x(i).toFixed(1)+" "+y(r).toFixed(1)).join(" L ")}"/>`;
+  }).join("");
+  // right margin: "P. Team" + last-5 form squares + pts, aligned to the line end
+  const FORM_FILL = {W:"var(--green)", D:"rgba(242,245,239,.45)", L:"var(--red)"};
+  const labels = all.filter(t=>colorOf(t)).map(t=>{
+    const yy = y(hist[t][R-1]);
+    const x0 = W-PR+8;
+    const chips = form[t].slice(-5).map((f,i)=>
+      `<rect x="${x0+108+i*15}" y="${yy-9}" width="12" height="12" rx="2.5"
+         fill="${FORM_FILL[f]}"/>
+       <text x="${x0+114+i*15}" y="${yy+1}" text-anchor="middle"
+         fill="#0e2413" font-size="9" font-weight="800">${f}</text>`).join("");
+    return `<text x="${x0}" y="${yy+3}" fill="${colorOf(t)}" font-size="12"
+        font-weight="700">${hist[t][R-1]}. ${esc(t)}</text>
+      ${chips}
+      <text x="${x0+188}" y="${yy+3}" font-size="11"
+        fill="var(--line)">${pts[t]}</text>`;
+  }).join("");
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" aria-label="League position by round">
+    ${[1,Math.ceil(all.length/2),all.length].map(r=>
+      `<line x1="${PL}" x2="${W-PR}" y1="${y(r)}" y2="${y(r)}" stroke="var(--grid)"/>
+       <text x="${PL-4}" y="${y(r)+3}" text-anchor="end">${r}</text>`).join("")}
+    ${lines}${labels}
+    <text x="${PL}" y="${H-4}">round →</text>
+  </svg>`;
+  const svg = el.querySelector("svg");
+  svg.addEventListener("mousemove", e=>{
+    const p = e.target.closest("path[data-team]");
+    p ? showTip(e, `<div class="t">${esc(p.dataset.team)}</div>now P${hist[p.dataset.team].at(-1)} · ${pts[p.dataset.team]} pts`)
+      : hideTip();
+  });
+  svg.addEventListener("mouseleave", hideTip);
+  svg.addEventListener("click", e=>{
+    const p = e.target.closest("path[data-team]");
+    if(p) toggleTeam(p.dataset.team);
+  });
+}
+
+/* ---------- chart 2: long-run Elo + all-time stats ---------- */
+const eloCache = new Map();     // lg|eloName -> promise<series>
+const medCache = new Map();     // lg -> promise<[[date, medianElo]]>
+const aggCache = new Map();     // lg|team -> promise<all-time aggregate>
+
+function eloSeries(eloName, lg){
+  const k = `${lg}|${eloName}`;
+  if(!eloCache.has(k))
+    eloCache.set(k, hubAll("club_elo", {select:"snapshot_date,elo",
+      team:`eq.${eloName}`, league:`eq.${lg}`, order:"snapshot_date"}));
+  return eloCache.get(k);
+}
+function leagueMedian(lg){
+  if(!medCache.has(lg)){
+    const dates = [];
+    for(let y=2008; y<=2025; y++){ dates.push(`${y}-09-01`, `${y+1}-02-01`); }
+    medCache.set(lg, (async () => {
+      const rows = await hub("club_elo", {select:"snapshot_date,elo", league:`eq.${lg}`,
+        snapshot_date:`in.(${dates.join(",")})`, order:"snapshot_date", limit:"2000"});
+      const out = [];
+      for(const d of dates){
+        const v = rows.filter(r=>r.snapshot_date===d).map(r=>r.elo).sort((a,b)=>a-b);
+        if(v.length>=10) out.push([d, v[Math.floor(v.length/2)]]);
+      }
+      return out;
+    })());
+  }
+  return medCache.get(lg);
+}
+function allTimeAgg(team, lg){
+  const k = `${lg}|${team}`;
+  if(!aggCache.has(k))
+    aggCache.set(k, (async () => {
+      const q = `"${team.replaceAll('"','')}"`;
+      const rows = await hub("matches", {
+        select: "home_team,away_team,home_goals,away_goals,result",
+        league: `eq.${lg}`, or: `(home_team.eq.${q},away_team.eq.${q})`, limit: "1000"});
+      const a = {p:0,w:0,d:0,l:0,gf:0,ga:0};
+      for(const m of rows){
+        const home = m.home_team === team;
+        const my = home ? m.home_goals : m.away_goals;
+        const op = home ? m.away_goals : m.home_goals;
+        if(my==null || op==null) continue;
+        a.p++; a.gf += my; a.ga += op;
+        if(my>op) a.w++; else if(my<op) a.l++; else a.d++;
+      }
+      return a;
+    })());
+  return aggCache.get(k);
+}
+
+async function renderLongrun(){
+  const {lg, teams} = state();
+  const el = document.getElementById("longrun");
+  const statsEl = document.getElementById("elostats");
+  if(!teams.length){
+    el.innerHTML = `<div class="empty">Add teams to compare.</div>`;
+    statsEl.innerHTML = "";
+    return;
+  }
+  el.innerHTML = `<div class="empty">Loading…</div>`;
+  let med, series, aggs;
+  try{
+    [med, series, aggs] = await Promise.all([
+      leagueMedian(lg),
+      Promise.all(teams.map(t=>eloSeries(ELO_ALIAS[t] ?? t, lg))),
+      Promise.all(teams.map(t=>allTimeAgg(t, lg))),
+    ]);
+  }catch(e){
+    el.innerHTML = `<div class="empty">Could not load Elo (${esc(e.message)}).</div>`;
+    return;
+  }
+  const sel = teams.map((t,i)=>({team:t, color:SEL_COLORS[i], rows:series[i], agg:aggs[i]}));
+  const have = sel.filter(s=>s.rows.length);
+  const W=1000,H=320,PL=46,PR=12,PT=12,PB=24;
+  if(have.length){
+    const all = [...med.map(([,v])=>v), ...have.flatMap(s=>s.rows.map(r=>r.elo))];
+    const lo=Math.min(...all)-15, hi=Math.max(...all)+15;
+    const t0=+new Date("2008-07-01"), t1=+new Date("2026-07-01");
+    const x=d=>PL+(W-PL-PR)*(+new Date(d)-t0)/(t1-t0);
+    const y=v=>PT+(H-PT-PB)*(1-(v-lo)/(hi-lo));
+    // break the line at gaps > ~5 months: relegation spells are dropped from
+    // the data, and a straight bridge across them would invent history
+    const gapSplit = pts => {
+      const segs=[]; let run=[];
+      for(const p of pts){
+        if(run.length && (+new Date(p[0]) - +new Date(run.at(-1)[0])) > 150*86400e3){
+          if(run.length>1) segs.push(run);
+          run=[];
+        }
+        run.push(p);
+      }
+      if(run.length>1) segs.push(run);
+      return segs;
+    };
+    const draw=(seg,attr)=>`<path fill="none" ${attr}
+      d="M${seg.map(([d,v])=>x(d).toFixed(1)+" "+y(v).toFixed(1)).join(" L ")}"/>`;
+    // out-of-top-flight spells: grey bridge + label instead of inventing an
+    // Elo path we don't have
+    const path=(pts,attr)=>{
+      const segs = gapSplit(pts);
+      let out = segs.map(seg=>draw(seg,attr)).join("");
+      for(let i=1; i<segs.length; i++){
+        const [d0,v0] = segs[i-1].at(-1), [d1,v1] = segs[i][0];
+        const x0=x(d0), x1=x(d1);
+        out += `<line x1="${x0.toFixed(1)}" y1="${y(v0).toFixed(1)}"
+          x2="${x1.toFixed(1)}" y2="${y(v1).toFixed(1)}"
+          stroke="rgba(242,245,239,.3)" stroke-width="1.5" stroke-dasharray="3 4"/>`;
+        if(x1-x0 > 46)
+          out += `<text x="${((x0+x1)/2).toFixed(1)}"
+            y="${((y(v0)+y(v1))/2 - 6).toFixed(1)}" text-anchor="middle"
+            font-size="9">demoted/promoted</text>`;
+      }
+      return out;
+    };
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" id="lrsvg" aria-label="Club Elo since 2008 vs league median">
+      ${[1600,1700,1800,1900,2000,2100].filter(g=>g>lo&&g<hi).map(g=>
+        `<line x1="${PL}" x2="${W-PR}" y1="${y(g)}" y2="${y(g)}" stroke="var(--grid)"/>
+         <text x="${PL-4}" y="${y(g)+3}" text-anchor="end">${g}</text>`).join("")}
+      ${draw(med, 'stroke="var(--chalk-y)" stroke-width="2" stroke-dasharray="6 4" opacity=".75"')}
+      ${have.map(s=>path(s.rows.map(r=>[r.snapshot_date,r.elo]),
+          `stroke="${s.color}" stroke-width="2" data-team="${esc(s.team)}"`)).join("")}
+      ${have.map(s=>{
+        const last = s.rows.at(-1);
+        return `<text x="${Math.min(x(last.snapshot_date)+4, W-90)}" y="${y(last.elo)-4}"
+          fill="${s.color}" font-size="12">${esc(s.team)}</text>`;}).join("")}
+      ${[2010,2015,2020,2025].map(yy=>
+        `<text x="${x(yy+"-01-01")}" y="${H-6}" text-anchor="middle">${yy}</text>`).join("")}
+    </svg>`;
+    const svg = document.getElementById("lrsvg");
+    svg.addEventListener("mousemove", e=>{
+      const r = svg.getBoundingClientRect();
+      const px=(e.clientX-r.left)/r.width*W, py=(e.clientY-r.top)/r.height*H;
+      let best=null, bd=1e18;
+      for(const s of have) for(const row of s.rows){
+        const d=(x(row.snapshot_date)-px)**2 + (y(row.elo)-py)**2;
+        if(d<bd){bd=d;best={...row, team:s.team};}
+      }
+      best ? showTip(e, `<div class="t">${esc(best.team)} · ${esc(best.snapshot_date)}</div>Elo ${best.elo.toFixed(0)}`)
+           : hideTip();
+    });
+    svg.addEventListener("mouseleave", hideTip);
+  }else{
+    el.innerHTML = `<div class="empty">No Elo series for the selected teams —
+      club-name mapping gap.</div>`;
+  }
+  // all-time aggregate stat card per team
+  statsEl.innerHTML = sel.map(s=>{
+    const peak = s.rows.length ? s.rows.reduce((a,r)=>r.elo>a.elo?r:a) : null;
+    const now = s.rows.at(-1);
+    const a = s.agg;
+    return `<div class="statcard" style="border-color:${s.color}">
+      <div class="t">${esc(s.team)}</div>
+      ${peak ? `<div>Elo now <b>${now.elo.toFixed(0)}</b> · peak
+        <b>${peak.elo.toFixed(0)}</b> <span class="l">(${peak.snapshot_date.slice(0,4)})</span></div>`
+        : `<div class="l">no Elo series (name mapping gap)</div>`}
+      <div>2008→now: <b>${a.p}</b> matches · <b>${a.w}</b>W ${a.d}D ${a.l}L
+        <span class="l">(${a.p ? Math.round(100*a.w/a.p) : 0}% won)</span></div>
+      <div class="l">GF ${a.gf} · GA ${a.ga} · GD ${a.gf-a.ga>0?"+":""}${a.gf-a.ga}</div>
+    </div>`;
+  }).join("");
+}
+
+/* ---------- chip wiring ---------- */
+document.getElementById("lgchips").addEventListener("click", e=>{
+  const lg = e.target.dataset?.lg;
+  if(lg) setState({lg, teams: []});
+});
+document.getElementById("sschips").addEventListener("click", e=>{
+  const ss = e.target.dataset?.ss;
+  if(ss) setState({ss});
+});
+
+load();
+</script>
+</body>
+</html>

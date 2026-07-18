@@ -35,7 +35,10 @@ def fetch_club_elo_history(team: str, since: str = "2008-01-01",
 
     def produce():
         df = sd.ClubElo().read_team_history(team).reset_index()
-        df = df[df["from"] >= since]
+        # last row is a forward placeholder (rating pre-booked for the next
+        # window, e.g. from=Aug to=Dec of the coming season) — not a snapshot
+        today = pd.Timestamp.now().strftime("%Y-%m-%d")
+        df = df[(df["from"] >= since) & (df["from"] <= today)]
         df = df.rename(columns={"from": "elo_from", "to": "elo_to"})
         df["elo_from"] = df["elo_from"].dt.strftime("%Y-%m-%d")
         df["elo_to"] = df["elo_to"].dt.strftime("%Y-%m-%d")

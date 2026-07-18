@@ -1,7 +1,8 @@
 # Topical Map
 
-Generated 2026-07-16 at `d843bb9` · `⟶` = dependency edge · `▓ planned ▓` = claimed in
-docs/UI but absent from code · regenerate stale sections, don't patch prose.
+Generated 2026-07-17 at `8fb49fd` (+ match-center branch) · `⟶` = dependency edge ·
+`▓ planned ▓` = claimed in docs/UI but absent from code · regenerate stale sections,
+don't patch prose.
 
 ---
 
@@ -12,18 +13,18 @@ docs/UI but absent from code · regenerate stale sections, don't patch prose.
                        │ A0 Landing (pitch)     │
                        │ site/index.html        │
                        └───────────┬────────────┘
-              ┌────────────────────┼──────────────────────┐
-              v                    v                       v
-┌──────────────────────┐ ┌─────────────────────┐ ┌──────────────────────┐
-│ A1 Player Dashboard  │ │ ▓ A2 player screens │ │ ▓ A3 market screens  │
-│ site/player.html     │ │ scouting, value-vs- │ │ transfer market,     │
-└──────────┬───────────┘ │ output              │ │ inflation, age curves│
-           │             └─────────────────────┘ └──────────────────────┘
-           v                        ┌──────────────────────┐
-┌──────────────────────┐            │ ▓ A4 event screens   │
-│ Supabase (read, anon)│            │ match center, shot   │
-└──────────────────────┘            │ maps, xG studio      │
-                                    └──────────────────────┘
+        ┌──────────────────┬───────┴────────────┬──────────────────────┐
+        v                  v                    v                      v
+┌──────────────────┐ ┌──────────────────┐ ┌─────────────────┐ ┌───────────────────┐
+│ A1 Player        │ │ A7 Match Center  │ │ ▓ A2 player     │ │ ▓ A3 market       │
+│ Dashboard        │ │ site/match.html  │ │ screens:        │ │ screens: transfer │
+│ site/player.html │ │ standings, form, │ │ scouting,       │ │ market, inflation,│
+└────────┬─────────┘ │ elo              │ │ value-vs-output │ │ age curves        │
+         │           └────────┬─────────┘ └─────────────────┘ └───────────────────┘
+         v                    v                  ┌──────────────────────┐
+┌────────────────────────────────────┐           │ ▓ A4 event screens   │
+│ Supabase (read, anon key, RLS)     │           │ shot maps, xG studio │
+└────────────────────────────────────┘           └──────────────────────┘
 ┌──────────────────────────┐   ┌───────────────────────────┐
 │ A5 FootballScout Machine │   │ A6 MCP server (agents)    │
 │ legacy, standalone       │   │ soccerhub/mcp_server.py   │
@@ -31,25 +32,26 @@ docs/UI but absent from code · regenerate stale sections, don't patch prose.
 ```
 
 **[A0] Landing page**
-- What: pitch-themed hub; formation grid of 9 dashboard cards — 1 live, 8 `▓ planned ▓`
-  ("In training" / "Next window" in the UI).
-- Where: `site/index.html` (167 LOC, static — no JS beyond SMIL ball animation).
+- What: pitch-themed hub; formation grid of 9 dashboard cards — 2 live (Player,
+  Match Center), 7 `▓ planned ▓` ("In training" / "Next window" in the UI).
+- Where: `site/index.html` (static — no JS beyond SMIL ball animation).
 - Docs: none dedicated; deployed by `.github/workflows/deploy-pages.yml`.
-- Edges: ⟶ A1 (only live link: `href="player.html"` ×2).
-- Note: footer's "refreshed twice weekly" holds — cron matrixes all 5 leagues +
-  transfers (see C2/C3).
+- Edges: ⟶ A1, ⟶ A7.
+- Note: footer's "refreshed twice weekly" holds — cron covers all tables (C2/C3/C6/C7).
 
 ---
 
 **[A1] Player Dashboard**
-- What: player search → career page: market-value chart (transfer + synthetic club-change
-  markers), G+A chart with minutes and G+A/90 overlay lines, transfer history table,
-  season log.
-- Where: `site/player.html` (429 LOC, single file, inline JS; functions `hub()`,
-  `runSearch()`, `load()`, `render()`, `valueChart()`, `gaChart()`, `wireTooltips()`).
+- What: player search → FIFA-style card per season: output-percentile rating vs
+  positional peers, Bargain/Fair/Premium verdict (output pct − value pct, ±15 band),
+  position-specific bars (FW/MF npG+A/90 · DF Tkl+Int/90 · GK save%), booking-card
+  dots, value-vs-output peer scatter, career trend with age-curve overlay,
+  market-value chart with transfer markers, collapsed transfer/season tables.
+- Where: `site/player.html` (single file, inline JS; `hub()`, `cardModel()`,
+  `pctsOf()` midrank percentiles, `scatter()`, `trendChart()`, `valueChart()`).
 - Docs: none.
 - Edges: ⟶ Supabase PostgREST (anon key, RLS select-only) reading `player_season`,
-  `transfers`; ⟵ A0 (nav).
+  `transfers`, `age_curve`; ⟵ A0 (nav).
 
 ---
 
@@ -67,11 +69,23 @@ docs/UI but absent from code · regenerate stale sections, don't patch prose.
 
 ---
 
-**[▓ A4] Event screens — Match Center, Shot Maps, xG Studio**
-- What: fixtures/results, event-level shot data, xG-vs-goals. Cards only.
-- Where: `site/index.html:143-157`.
-- Edges: would need schedule data (not ingested) and StatsBomb events (B1 reader exists,
-  nothing downstream of it).
+**[▓ A4] Event screens — Shot Maps, xG Studio**
+- What: event-level shot data, xG-vs-goals. Cards only.
+- Where: `site/index.html` (cards marked `pos soon`).
+- Edges: would need StatsBomb events / Understat (B1 statsbomb reader exists,
+  nothing downstream of it) — Phase C/D.
+
+---
+
+**[A7] Match Center**
+- What: league + season picker → standings table computed client-side from match
+  results, per-team panel (form chips, recent matches, Elo trend line).
+- Where: `site/match.html` (single file, inline JS, same theme tokens as A1).
+- Docs: none.
+- Edges: ⟶ Supabase reading `matches`, `club_elo`; ⟵ A0 (nav).
+- Known seam: club names differ per source (football-data "Bayern Munich" vs
+  ClubElo "Bayern") — interim JS alias map; a proper `club_xref` table is the
+  future fix (same ladder pattern as `player_xref`).
 
 ---
 
@@ -146,13 +160,17 @@ docs/UI but absent from code · regenerate stale sections, don't patch prose.
 
 **[B1] Readers**
 - What: source fetchers, one file per source; return `Manifest`, never DataFrames.
-- Where: `soccerhub/readers/fbref.py` (67 LOC — `_patch_league_config()` writes
+- Where: `soccerhub/readers/` — `fbref.py` (`_patch_league_config()` writes
   soccerdata's `league_dict.json` before import; `_season_to_code()` disambiguates
-  "2021"→"2122"), `transfermarkt.py` (93 — players/transfers/values from
-  transfermarkt-datasets), `statsbomb.py` (15 — events via kloppy).
+  "2021"→"2122"; `stat_type` param for misc/keeper pages), `transfermarkt.py`
+  (players/transfers/values from transfermarkt-datasets), `matchhistory.py`
+  (football-data.co.uk CSVs via bare `pandas.read_csv` — soccerdata's own
+  MatchHistory reader 503s on this host), `clubelo.py` (snapshot by date +
+  per-team history, plain HTTPS), `statsbomb.py` (events via kloppy, unused).
 - Docs: hub README "Use (package)".
-- Edges: ⟶ B0; ⟵ B2/B3 (`refetch` param forwards as `force`), ⟵ B6
-  (`push_transfers`), ⟵ A6.
+- Edges: ⟶ B0; ⟵ B2/B3 (`refetch` param forwards as `force`), ⟵ B6 presets, ⟵ A6.
+- Note: only fbref needs a browser (Cloudflare/selenium) — the source of past
+  zombie-Chrome memory leaks; every other source is a plain HTTP fetch.
 
 ---
 
@@ -199,45 +217,53 @@ docs/UI but absent from code · regenerate stale sections, don't patch prose.
 **[B6] Pipeline presets (cron entry points)**
 - What: `run_season()` — xref (refetch) → push_xref → player_season (refetch) →
   upsert; `force=True` means re-download sources, not just re-merge. Plus
-  `push_transfers()` — transfers reader → upsert on `tm_id,transfer_date`.
-- Where: `soccerhub/pipelines/__init__.py` — `run_season()`, `push_xref()`,
-  `push_transfers()`, `XREF_CONFLICT_KEY`, `TRANSFERS_CONFLICT_KEY`.
-- Edges: ⟶ B1, B2, B3, B4; ⟵ B8 cron.
+  `push_transfers()`, `push_age_curve()` (derived from the hub itself —
+  PostgREST aggregates disabled), `push_matches(league, season)`,
+  `push_club_elo(date)` and `push_club_elo_history(team)` (level==1 +
+  country→league map; relegation spells dropped, not mislabeled).
+- Where: `soccerhub/pipelines/__init__.py` + `pipelines/matches.py`; conflict
+  keys mirror each table's PK.
+- Edges: ⟶ B1, B2, B3, B4, B5; ⟵ B8 cron.
 
 ---
 
 **[B7] Migrations (manual apply)**
-- What: 4 SQL files — schema + RLS anon-read policies. **No migration runner**: user
+- What: 7 SQL files — schema + RLS anon-read policies. **No migration runner**: user
   applies each in the Supabase SQL editor by hand; files are the record, not the tool.
-- Where: `Soccer Data Hub/supabase/migrations/0001_player_season.sql … 0004_player_xref.sql`.
+  Tables: player_season (+0003 clean cols, +0006 defense/keeper cols), transfers,
+  player_xref, age_curve, matches, club_elo.
+- Where: `Soccer Data Hub/supabase/migrations/0001 … 0007`.
 - Edges: defines tables B4 writes and B5/B10 read.
 
 ---
 
 **[B8] CI / automation**
-- What: two workflows. `run-season.yml`: cron Mon+Thu 06:00 UTC — matrix over all 5
-  leagues (`max-parallel: 1`, FBref IP-block protection) → `run_season(league,
-  SEASON, force=True)`, plus a `transfers` job → `push_transfers(force=True)`;
-  `workflow_dispatch` takes a season override. `deploy-pages.yml`: push to main
-  touching `site/**` → GitHub Pages.
+- What: two workflows. `run-season.yml`: cron Mon+Thu 06:00 UTC, five jobs —
+  `seasons` (5-league matrix, `max-parallel: 1` for FBref IP-block protection),
+  `transfers`, `matches` (5-league matrix, full parallel — plain CSV, no scrape
+  risk), `club-elo` (daily snapshot), `age-curve` (needs: seasons — derived from
+  the hub). `workflow_dispatch` takes a season override. `deploy-pages.yml`:
+  push to main touching `site/**` → GitHub Pages.
 - Where: `.github/workflows/run-season.yml`, `.github/workflows/deploy-pages.yml`.
-- Note: `SEASON` default is hardcoded "2025" — bump each August.
+- Note: `SEASON` default is hardcoded "2025" — bump each August. The five-job
+  pipeline has not yet had a green scheduled run — verify after next merge.
 
 ---
 
 **[B9] Tests**
-- What: pytest, 13 files / 38 tests, all monkeypatch-based (no network). Cover season
-  codes, xref ladder, disambiguation, clean() rules, upsert chunking, read_hub
-  pagination, run_season refetch propagation, push_transfers, MCP tools, exports.
+- What: pytest, 15 files / 45 tests, all monkeypatch-based (no network). Cover season
+  codes, xref ladder, disambiguation, clean() rules, defense/keeper merge, upsert
+  chunking, read_hub pagination, refetch propagation, every push_* preset's table +
+  conflict key, MCP tools, exports.
 - Where: `Soccer Data Hub/tests/test_*.py`.
 - Edges: ⟶ every B0–B6 unit.
 
 ---
 
 **[B10] Site frontend**
-- What: two static HTML files, inline CSS/JS, zero dependencies and no build step.
+- What: three static HTML files, inline CSS/JS, zero dependencies and no build step.
   Talks straight to PostgREST with the publishable anon key (safe: RLS select-only).
-- Where: `site/index.html` (167 LOC), `site/player.html` (429 LOC).
+- Where: `site/index.html`, `site/player.html`, `site/match.html`.
 - Edges: ⟶ Supabase REST; deployed by B8. Duplicates B5's pagination/read logic in JS —
   intentional (no shared runtime between Python and browser).
 
@@ -312,6 +338,38 @@ page's synthetic club-change markers stay necessary.
 
 ---
 
+**C6 · Match results refresh (write path)**
+
+```
+run-season.yml `matches` job (5-league matrix, parallel)
+  └──> push_matches(league, SEASON, force=True)   pipelines/__init__.py
+         └──> build_matches()                     pipelines/matches.py
+                └──> fetch_match_history()        readers/matchhistory.py
+                       pd.read_csv(football-data.co.uk/mmz4281/<code>/<div>.csv)
+                       └──> column map, DD/MM/YY(YY) → ISO, drop void rows
+                └──> + league/season key cols
+         └──> upsert_df(df, "matches", "league,season,date,home_team,away_team")
+```
+Backfilled 2008–2025 × 5 leagues (32,545 rows, zero failures).
+
+---
+
+**C7 · Club Elo refresh (write path)**
+
+```
+run-season.yml `club-elo` job
+  └──> push_club_elo(force=True)                 today's snapshot, Big-5 filter
+         └──> fetch_club_elo_snapshot()          readers/clubelo.py (date-keyed cache)
+         └──> upsert_df(df, "club_elo", "team,league,snapshot_date")
+one-off backfill (done):
+  push_club_elo_history(team) per club           per-rating-change series since 2008
+  + twice-yearly date snapshots 2008–2025        covers clubs the per-team endpoint
+                                                 can't serve (Saint-Etienne, Arles)
+```
+191k rows. Team names are ClubElo spellings — see the A7 club-name seam.
+
+---
+
 **C4 · Landing/site deploy**
 
 ```
@@ -336,10 +394,12 @@ impute ──> Male_Players.csv / Female_Players.csv (local) ──> player_stat
 
 | Product node | Runs on | Key seam to check when touching it |
 |---|---|---|
-| A0 Landing | B10, B8 (pages) | card stats hard-coded (49,692 / 35,123) — restate after big loads |
+| A0 Landing | B10, B8 (pages) | card stats hard-coded — restate after big loads |
 | A1 Player Dashboard | B10 ⟶ B7 tables ⟵ C2 | JS `hub()` vs Python `read_hub()` — same PostgREST semantics, changed separately |
 | A1 value markers | C2 + C3 | upstream transfer coverage partial — synthetic markers stay necessary |
-| ▓ A2/A3 screens | B5 or B10, C2/C3 | both tables cron-refreshed; build when ready |
-| ▓ A4 screens | B1 statsbomb (unused) | no schedule/event ingestion exists yet |
+| A1 verdict/bars | C2 (misc/keeper 2017+) | DF/GK metrics absent pre-2017 — card degrades to "NO VERDICT" by design |
+| A7 Match Center | C6 + C7 | club-name mismatch across sources — JS alias map until a `club_xref` exists |
+| ▓ A2/A3 screens | B5 or B10, C2/C3 | tables cron-refreshed; build when ready |
+| ▓ A4 screens | B1 statsbomb (unused) | no event ingestion yet — Phase C/D |
 | A6 MCP server | B1 + B5 | hub_table truncates at max_rows — filter before trusting counts |
 | A5 legacy | nothing shared | safe to archive; only root README references it |
