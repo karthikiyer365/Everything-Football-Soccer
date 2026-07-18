@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Match Center — SoccerHub</title>
+<meta name="description" content="Standings, results, form and club Elo across Europe's big five leagues, 2008 to today.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<style>
+  :root{
+    --grass:#122b1a; --grass-lt:#16321f; --card:#0a1a0e;
+    --line:#f2f5ef; --muted:#9fb69c; --tag:#8fae8b; --border:rgba(242,245,239,.22);
+    --amber:#ffb43a; --green:#8fd18a; --chalk-y:#e8d47a; --blue:#5aa9f0;
+    --red:#e0524a; --grid:rgba(242,245,239,.10); --axis:rgba(242,245,239,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:
+       repeating-linear-gradient(0deg,var(--grass) 0 72px,var(--grass-lt) 72px 144px);
+       color:var(--line);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+       min-height:100vh}
+  .disp{font-family:"Avenir Next Condensed","Arial Narrow","Helvetica Neue Condensed",Impact,sans-serif;
+        text-transform:uppercase;letter-spacing:.04em;font-stretch:condensed}
+  .nums{font-variant-numeric:tabular-nums}
+  a{color:var(--chalk-y)}
+
+  .top{position:sticky;top:0;z-index:5;display:flex;gap:16px;align-items:center;
+       padding:12px 20px;background:rgba(5,14,8,.92);backdrop-filter:blur(4px);
+       border-bottom:1px solid var(--border)}
+  .top a.home{color:var(--line);text-decoration:none;font-size:1.05rem;white-space:nowrap}
+  .top h1{margin:0;font-size:1.05rem;color:var(--muted);font-weight:400}
+
+  main{max-width:1120px;margin:0 auto;padding:24px 20px 80px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+  .chips button{border:1px solid var(--border);background:var(--card);color:var(--muted);
+       border-radius:999px;padding:4px 12px;font:inherit;font-size:.8rem;cursor:pointer}
+  .chips button[aria-pressed="true"]{background:var(--amber);color:#20160a;
+       border-color:var(--amber);font-weight:700}
+  .chips button:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+
+  .duo{display:grid;grid-template-columns:1fr 380px;gap:22px;align-items:start;margin-top:14px}
+  @media(max-width:960px){.duo{grid-template-columns:1fr}}
+
+  .box{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px}
+  .box h2{margin:0 0 8px;font-size:.8rem;letter-spacing:.16em;
+        text-transform:uppercase;color:var(--tag);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .box h2 .plain{color:var(--muted);letter-spacing:0;text-transform:none}
+  .box p.cap{margin:8px 0 0;font-size:12px;color:var(--muted)}
+  .scroll{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:.86rem;min-width:560px}
+  th,td{padding:7px 9px;text-align:right;border-top:1px solid rgba(242,245,239,.08)}
+  th{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--tag);font-weight:600}
+  th:nth-child(2),td:nth-child(2){text-align:left}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:rgba(255,180,58,.06)}
+  tbody tr[aria-selected="true"]{background:rgba(255,180,58,.14)}
+  .formchips{display:inline-flex;gap:3px}
+  .fw,.fd,.fl{width:16px;height:16px;border-radius:3px;display:inline-flex;
+       align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#0e2413}
+  .fw{background:var(--green)} .fd{background:rgba(242,245,239,.45)} .fl{background:var(--red)}
+  .empty{color:var(--muted);text-align:center;padding:60px 16px}
+
+  .panel{display:grid;gap:18px}
+  .panel .teamname{font-size:26px;margin:0}
+  .mlist{list-style:none;margin:8px 0 0;padding:0;font-size:.84rem}
+  .mlist li{display:grid;grid-template-columns:74px 1fr auto 1fr;gap:8px;
+       padding:5px 0;border-top:1px solid rgba(242,245,239,.08);align-items:baseline}
+  .mlist .d{color:var(--muted)}
+  .mlist .h{text-align:right}
+  .mlist .score{font-weight:700;padding:0 4px}
+  .mlist .win{color:var(--green)} .mlist .loss{color:var(--red)} .mlist .draw{color:var(--muted)}
+  .chartbox{position:relative}
+  .chartbox svg{width:100%;height:auto;display:block}
+  #tip{position:fixed;z-index:9;pointer-events:none;display:none;background:#050e08;
+       border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-size:.8rem;
+       color:var(--line);box-shadow:0 4px 16px rgba(0,0,0,.5)}
+  #tip .t{color:var(--tag);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<nav class="top">
+  <a class="home disp" href="index.html">⚽ SoccerHub</a>
+  <h1>Match Center</h1>
+</nav>
+
+<main>
+  <div class="chips" id="lgchips"></div>
+  <div class="chips nums" id="sschips"></div>
+  <div class="duo">
+    <div class="box">
+      <h2>Standings <span class="plain" id="stmeta"></span></h2>
+      <div class="scroll" id="standings"><div class="empty">Loading…</div></div>
+      <p class="cap">Computed from match results. Click a team for form, results and Elo.</p>
+    </div>
+    <div class="panel" id="panel">
+      <div class="box"><div class="empty">Pick a team from the table.</div></div>
+    </div>
+  </div>
+</main>
+<div id="tip" role="status"></div>
+
+<script>
+const SUPABASE_URL = "https://rgnzemkdldohplwbxxwy.supabase.co";
+const ANON_KEY = "sb_publishable_Qy0bJ4CdrxffuJGNq12ebw_r0-Z3qD-";
+const LEAGUES = ["ENG-Premier League","ESP-La Liga","GER-Bundesliga",
+                 "ITA-Serie A","FRA-Ligue 1"];
+const SEASONS = Array.from({length: 18}, (_,i)=>String(2008+i));
+
+// football-data team name -> ClubElo team name, where they differ
+// (interim seam until a club_xref table exists — see TOPICAL_MAP)
+const ELO_ALIAS = {
+  "Bayern Munich":"Bayern","Ath Madrid":"Atletico","Ath Bilbao":"Bilbao",
+  "Espanol":"Espanyol","Ein Frankfurt":"Frankfurt","FC Koln":"Koeln",
+  "M'gladbach":"Gladbach","Nott'm Forest":"Forest","Nurnberg":"Nuernberg",
+  "Sp Gijon":"Gijon","La Coruna":"Depor","Kaiserslautern":"Lautern",
+  "Fortuna Dusseldorf":"Duesseldorf","Greuther Furth":"Fuerth",
+  "Holstein Kiel":"Holstein","Evian Thonon Gaillard":"Evian TG",
+  "Ajaccio GFCO":"Gazelec","Werder Bremen":"Werder","St Etienne":"Saint-Etienne",
+  "Vallecano":"Rayo Vallecano",
+};
+
+async function hub(table, params){
+  const q = new URLSearchParams(params);
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${q}`,
+                        {headers:{apikey: ANON_KEY}});
+  if(!r.ok) throw new Error(`${table}: ${r.status}`);
+  return r.json();
+}
+const esc = s => String(s).replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ---------- state via URL ---------- */
+const state = () => {
+  const u = new URLSearchParams(location.search);
+  return {
+    lg: LEAGUES.includes(u.get("lg")) ? u.get("lg") : LEAGUES[0],
+    ss: SEASONS.includes(u.get("s")) ? u.get("s") : SEASONS[SEASONS.length-1],
+    team: u.get("team"),
+  };
+};
+function setState(patch){
+  const cur = {...state(), ...patch};
+  const u = new URL(location);
+  u.search = `?lg=${encodeURIComponent(cur.lg)}&s=${cur.ss}` +
+             (cur.team ? `&team=${encodeURIComponent(cur.team)}` : "");
+  history.pushState({}, "", u);
+  load();
+}
+window.addEventListener("popstate", load);
+
+/* ---------- standings from matches ---------- */
+function computeTable(matches){
+  const t = {};
+  const row = n => t[n] ??= {team:n, p:0,w:0,d:0,l:0, gf:0, ga:0, pts:0, form:[]};
+  for(const m of matches){
+    if(m.home_goals==null || m.away_goals==null) continue;
+    const h = row(m.home_team), a = row(m.away_team);
+    h.p++; a.p++;
+    h.gf += m.home_goals; h.ga += m.away_goals;
+    a.gf += m.away_goals; a.ga += m.home_goals;
+    if(m.result === "H"){ h.w++; h.pts += 3; a.l++; h.form.push("W"); a.form.push("L"); }
+    else if(m.result === "A"){ a.w++; a.pts += 3; h.l++; a.form.push("W"); h.form.push("L"); }
+    else { h.d++; a.d++; h.pts++; a.pts++; h.form.push("D"); a.form.push("D"); }
+  }
+  return Object.values(t).sort((x,y)=>
+    y.pts-x.pts || (y.gf-y.ga)-(x.gf-x.ga) || y.gf-x.gf || x.team.localeCompare(y.team));
+}
+
+let matches = [];  // current league-season rows, date-ordered
+
+async function load(){
+  const {lg, ss, team} = state();
+  document.getElementById("lgchips").innerHTML = LEAGUES.map(l=>
+    `<button data-lg="${esc(l)}" aria-pressed="${l===lg}">${esc(l.split("-")[1])}</button>`).join("");
+  document.getElementById("sschips").innerHTML = SEASONS.map(s=>
+    `<button data-ss="${s}" aria-pressed="${s===ss}">${s}</button>`).join("");
+
+  try{
+    matches = await hub("matches",
+      {select: "*", league: `eq.${lg}`, season: `eq.${ss}`, order: "date"});
+  }catch(e){
+    document.getElementById("standings").innerHTML =
+      `<div class="empty">Could not reach the database (${esc(e.message)}).</div>`;
+    return;
+  }
+  const table = computeTable(matches);
+  document.getElementById("stmeta").textContent =
+    `· ${lg.split("-")[1]} ${ss}/${String(+ss+1).slice(2)} · ${matches.length} matches`;
+  document.getElementById("standings").innerHTML = table.length ? `
+    <table class="nums">
+      <thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th>
+        <th>GF</th><th>GA</th><th>GD</th><th>Pts</th><th>Form</th></tr></thead>
+      <tbody>
+      ${table.map((r,i)=>`
+        <tr data-team="${esc(r.team)}" aria-selected="${r.team===team}">
+          <td>${i+1}</td><td>${esc(r.team)}</td><td>${r.p}</td><td>${r.w}</td>
+          <td>${r.d}</td><td>${r.l}</td><td>${r.gf}</td><td>${r.ga}</td>
+          <td>${r.gf-r.ga>0?"+":""}${r.gf-r.ga}</td><td><b>${r.pts}</b></td>
+          <td><span class="formchips">${r.form.slice(-5).map(f=>
+            `<span class="f${f.toLowerCase()}">${f}</span>`).join("")}</span></td>
+        </tr>`).join("")}
+      </tbody>
+    </table>` : `<div class="empty">No matches for this league-season.</div>`;
+
+  document.querySelector("#standings tbody")?.addEventListener("click", e=>{
+    const tr = e.target.closest("tr[data-team]");
+    if(tr) setState({team: tr.dataset.team});
+  });
+
+  if(team) renderPanel(team); else document.getElementById("panel").innerHTML =
+    `<div class="box"><div class="empty">Pick a team from the table.</div></div>`;
+}
+
+/* ---------- team panel: form, results, elo ---------- */
+async function renderPanel(team){
+  const {lg, ss} = state();
+  const mine = matches.filter(m=>m.home_team===team || m.away_team===team);
+  const items = mine.slice(-12).reverse().map(m=>{
+    const home = m.home_team===team;
+    const my = home ? m.home_goals : m.away_goals;
+    const op = home ? m.away_goals : m.home_goals;
+    const cls = my>op ? "win" : my<op ? "loss" : "draw";
+    return `<li><span class="d">${esc(m.date.slice(5))}</span>
+      <span class="h">${esc(m.home_team)}</span>
+      <span class="score ${cls}">${m.home_goals}–${m.away_goals}</span>
+      <span>${esc(m.away_team)}</span></li>`;
+  }).join("");
+
+  document.getElementById("panel").innerHTML = `
+    <div class="box">
+      <h2 class="plain"><span class="teamname disp">${esc(team)}</span></h2>
+      <ul class="mlist nums">${items || "<li>No matches.</li>"}</ul>
+    </div>
+    <div class="box" id="elobox">
+      <h2>Club Elo <span class="plain">· season window</span></h2>
+      <div class="chartbox"><div class="empty">Loading…</div></div>
+    </div>`;
+
+  const eloName = ELO_ALIAS[team] ?? team;
+  let elo = [];
+  try{
+    elo = await hub("club_elo", {select: "snapshot_date,elo",
+      team: `eq.${eloName}`, league: `eq.${lg}`,
+      snapshot_date: `gte.${ss}-07-01`, order: "snapshot_date"});
+    elo = elo.filter(r=>r.snapshot_date <= `${+ss+1}-06-30`);
+  }catch(e){ /* box shows the no-data message below */ }
+  const box = document.querySelector("#elobox .chartbox");
+  if(!elo.length){
+    box.innerHTML = `<div class="empty">No Elo series for "${esc(eloName)}" —
+      club-name mapping gap.</div>`;
+    return;
+  }
+  box.innerHTML = eloChart(elo);
+  wireEloTip(elo, team);
+}
+
+function eloChart(rows){
+  const W=360, H=170, PL=44, PB=24, PT=10, PR=10;
+  const vals = rows.map(r=>r.elo);
+  const lo = Math.min(...vals), hi = Math.max(...vals), pad = (hi-lo)*0.1 || 10;
+  const y = v => PT + (H-PT-PB) * (1 - (v-(lo-pad))/((hi+pad)-(lo-pad)));
+  const x = i => PL + (W-PL-PR) * (rows.length===1 ? .5 : i/(rows.length-1));
+  const pts = rows.map((r,i)=>`${x(i).toFixed(1)} ${y(r.elo).toFixed(1)}`);
+  return `<svg viewBox="0 0 ${W} ${H}" id="elochart" aria-label="Club Elo over the season">
+    ${[hi, lo].map(g=>`<line x1="${PL}" x2="${W-PR}" y1="${y(g)}" y2="${y(g)}"
+        stroke="var(--grid)"/><text x="${PL-6}" y="${y(g)+4}" text-anchor="end"
+        font-size="10" fill="var(--axis)">${Math.round(g)}</text>`).join("")}
+    <path fill="none" stroke="var(--blue)" stroke-width="2" d="M${pts.join(" L ")}"/>
+    <text x="${PL}" y="${H-6}" font-size="10" fill="var(--axis)">${rows[0].snapshot_date}</text>
+    <text x="${W-PR}" y="${H-6}" text-anchor="end" font-size="10" fill="var(--axis)">
+      ${rows[rows.length-1].snapshot_date}</text>
+    <line id="elocross" y1="${PT}" y2="${H-PB}" stroke="var(--axis)"
+      stroke-dasharray="3 3" visibility="hidden"/>
+  </svg>`;
+}
+
+function wireEloTip(rows, team){
+  const tip = document.getElementById("tip");
+  const svg = document.getElementById("elochart");
+  const cross = document.getElementById("elocross");
+  const W=360, PL=44, PR=10;
+  svg.addEventListener("mousemove", e=>{
+    const r = svg.getBoundingClientRect();
+    const px = (e.clientX-r.left)/r.width*W;
+    const i = Math.max(0, Math.min(rows.length-1,
+      Math.round((px-PL)/(W-PL-PR)*(rows.length-1))));
+    const cx = PL + (W-PL-PR)*(rows.length===1 ? .5 : i/(rows.length-1));
+    cross.setAttribute("x1",cx); cross.setAttribute("x2",cx);
+    cross.setAttribute("visibility","visible");
+    tip.innerHTML = `<div class="t">${esc(team)} · ${esc(rows[i].snapshot_date)}</div>
+      Elo ${rows[i].elo.toFixed(1)}`;
+    tip.style.display = "block";
+    tip.style.left = Math.min(e.clientX+14, innerWidth-170)+"px";
+    tip.style.top = (e.clientY+14)+"px";
+  });
+  svg.addEventListener("mouseleave", ()=>{
+    tip.style.display = "none"; cross.setAttribute("visibility","hidden");
+  });
+}
+
+/* ---------- chip wiring ---------- */
+document.getElementById("lgchips").addEventListener("click", e=>{
+  const lg = e.target.dataset?.lg;
+  if(lg) setState({lg, team: null});
+});
+document.getElementById("sschips").addEventListener("click", e=>{
+  const ss = e.target.dataset?.ss;
+  if(ss) setState({ss, team: null});
+});
+
+load();
+</script>
+</body>
+</html>
