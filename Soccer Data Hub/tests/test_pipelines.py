@@ -262,5 +262,6 @@ def test_public_exports():
     for fn in ("build_player_xref", "build_player_season",
                "push_to_supabase", "push_transfers", "push_age_curve",
                "push_matches", "push_club_elo", "push_club_elo_history",
+               "push_player_xg", "push_team_match", "push_shots",
                "run_season"):
         assert callable(getattr(soccerhub, fn))
