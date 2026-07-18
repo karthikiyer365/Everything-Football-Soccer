@@ -14,6 +14,9 @@ __all__ = [
     "push_to_supabase",
     "push_transfers",
     "push_age_curve",
+    "push_matches",
+    "push_club_elo",
+    "push_club_elo_history",
     "read_hub",
     "run_season",
 ]
@@ -21,6 +24,10 @@ __all__ = [
 XREF_CONFLICT_KEY = "league,season,team,fbref_name"
 TRANSFERS_CONFLICT_KEY = "tm_id,transfer_date"  # matches 0002 PK
 AGE_CURVE_CONFLICT_KEY = "primary_position,age"  # matches 0005 PK
+MATCHES_CONFLICT_KEY = "league,season,date,home_team,away_team"  # matches 0007 PK
+CLUB_ELO_CONFLICT_KEY = "team,league,snapshot_date"  # matches 0008 PK
+BIG5 = {"ENG-Premier League", "ESP-La Liga", "GER-Bundesliga",
+        "ITA-Serie A", "FRA-Ligue 1"}
 
 
 def push_transfers(force: bool = False) -> int:
@@ -61,6 +68,58 @@ def push_age_curve(min_minutes: int = 450, min_n: int = 30) -> int:
     g["avg_value_eur"] = g["avg_value_eur"].round().astype("Int64")
     g["age"] = g["age"].astype(int)
     return upsert_df(g, "age_curve", AGE_CURVE_CONFLICT_KEY)
+
+
+def push_matches(league: str, season: str, force: bool = False) -> int:
+    """One league-season of match results -> matches table."""
+    import pandas as pd
+
+    from soccerhub.pipelines.matches import build_matches
+    from soccerhub.pipelines.supa import upsert_df
+
+    m = build_matches(league, season, force=force, refetch=force)
+    return upsert_df(pd.read_parquet(m.path), "matches", MATCHES_CONFLICT_KEY)
+
+
+def push_club_elo(date: str | None = None, force: bool = False) -> int:
+    """Today's (or given date's) club Elo ratings -> club_elo table, Big-5 only."""
+    import pandas as pd
+
+    from soccerhub.pipelines.supa import upsert_df
+    from soccerhub.readers.clubelo import fetch_club_elo_snapshot
+
+    m = fetch_club_elo_snapshot(date, force=force)
+    df = pd.read_parquet(m.path)
+    df = df[df["league"].isin(BIG5)]
+    return upsert_df(df, "club_elo", CLUB_ELO_CONFLICT_KEY)
+
+
+# ClubElo history rows carry country+level, not a league name — top-flight
+# rows in these countries ARE our five leagues
+COUNTRY_TO_LEAGUE = {
+    "ENG": "ENG-Premier League", "ESP": "ESP-La Liga", "GER": "GER-Bundesliga",
+    "ITA": "ITA-Serie A", "FRA": "FRA-Ligue 1",
+}
+
+
+def push_club_elo_history(team: str, force: bool = False) -> int:
+    """One club's Elo time series -> club_elo table (top-flight spells only).
+
+    Second-division spells (relegation years) are dropped rather than
+    mislabeled: level==1 + country is what maps cleanly onto our league names.
+    """
+    import pandas as pd
+
+    from soccerhub.pipelines.supa import upsert_df
+    from soccerhub.readers.clubelo import fetch_club_elo_history
+
+    m = fetch_club_elo_history(team, force=force)
+    df = pd.read_parquet(m.path)
+    df = df[(df["level"] == 1) & df["country"].isin(COUNTRY_TO_LEAGUE)]
+    if df.empty:
+        return 0
+    df["league"] = df["country"].map(COUNTRY_TO_LEAGUE)
+    return upsert_df(df, "club_elo", CLUB_ELO_CONFLICT_KEY)
 
 
 def push_xref(manifest: Manifest, league: str, season: str) -> int:
