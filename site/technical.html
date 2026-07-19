@@ -82,9 +82,16 @@
   .split .fill{height:100%;border-radius:4px;background:var(--blue)}
   .split .r b{text-align:right;font-weight:600}
 
-  .radars{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
-  @media(max-width:900px){.radars{grid-template-columns:1fr}}
-  .axlist{margin-top:10px;font-size:11.5px}
+  .profile{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start;margin-top:16px}
+  @media(max-width:900px){.profile{grid-template-columns:1fr}}
+  .pizzawrap{text-align:center}
+  .pzlegend{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;
+       margin-top:8px;font-size:12px}
+  .pzlegend .i{display:flex;gap:6px;align-items:center;color:var(--muted)}
+  .axgroup{margin-bottom:14px}
+  .axgroup h3{margin:0 0 4px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+       display:flex;gap:7px;align-items:center}
+  .axlist{font-size:11.5px}
   .axlist .r{display:grid;grid-template-columns:1fr 52px 30px;gap:6px;padding:3px 0;
        border-top:1px solid rgba(242,245,239,.07)}
   .axlist .r span:first-child{color:var(--muted)}
@@ -380,9 +387,21 @@ async function render(){
     </div>
   </div>
 
-  <div class="radars" id="radars"></div>
-
-  <p class="note" id="notes"></p>`;
+  <div class="box" style="margin-top:16px">
+    <h2>Technical profile <span class="plain">· percentile vs positional peers</span></h2>
+    <div class="profile">
+      <div class="pizzawrap">
+        <div class="chartbox" id="pizza"><p class="cap">Ranking…</p></div>
+        <div class="pzlegend">
+          <span class="i"><span class="swatch" style="background:var(--amber)"></span>Attack</span>
+          <span class="i"><span class="swatch" style="background:var(--blue)"></span>Playmaking</span>
+          <span class="i"><span class="swatch" style="background:var(--green)"></span>Defence</span>
+        </div>
+      </div>
+      <div id="axlists"></div>
+    </div>
+    <p class="note" id="notes"></p>
+  </div>`;
 
   document.getElementById("chips").addEventListener("click", e=>{
     const v = e.target.dataset?.s; if(v) setSeason(v);
@@ -519,80 +538,103 @@ function drawShotStats(rows, mine){
     </div>`;
 }
 
-/* ---------- radars ---------- */
+/* ---------- pizza (percentile bar-radar) ---------- */
 async function drawRadars(mine, season){
-  const el = document.getElementById("radars");
-  if(!mine){ el.innerHTML = `<div class="box"><p class="cap">No minutes in this
-    selection.</p></div>`; return; }
-  el.innerHTML = GROUPS.map(g=>`<div class="box"><h2>${esc(g.name)}</h2>
-    <div class="chartbox" id="radar-${g.name.split(" ")[0]}">
-      <p class="cap">Ranking…</p></div></div>`).join("");
+  const pz = document.getElementById("pizza");
+  const ax = document.getElementById("axlists");
+  if(!mine){ pz.innerHTML = `<p class="cap">No minutes in this selection.</p>`;
+    ax.innerHTML = ""; return; }
 
   let pool;
   try{ pool = await peerPool(srow.league, srow.primary_position, season); }
-  catch(e){ el.innerHTML = `<div class="box"><p class="cap">Could not load the peer
-    pool (${esc(e.message)}).</p></div>`; return; }
+  catch(e){ pz.innerHTML = `<p class="cap">Could not load the peer pool
+    (${esc(e.message)}).</p>`; return; }
 
-  el.innerHTML = GROUPS.map(g=>{
-    const pcts = g.axes.map(a=>{
-      const raw = mine[a.k];
-      const p = raw==null ? null
-        : pctOf(pool.map(q=>q[a.k]).filter(v=>v!=null), raw);
-      return {...a, raw, pct: p==null ? null : (a.inv ? 100-p : p)};
-    });
-    return `<div class="box">
-      <h2>${esc(g.name)} <span class="plain">· ${g.grade} measure</span></h2>
-      <div class="chartbox">${radarSvg(pcts, g.color)}</div>
+  // one flat list of slices, in group order, each carrying its group's colour
+  const slices = [];
+  for(const g of GROUPS) for(const a of g.axes){
+    const raw = mine[a.k];
+    const p = raw==null ? null : pctOf(pool.map(q=>q[a.k]).filter(v=>v!=null), raw);
+    slices.push({...a, group:g.name, color:g.color, raw,
+                 pct: p==null ? null : (a.inv ? 100-p : p)});
+  }
+  pz.innerHTML = pizzaSvg(slices);
+
+  ax.innerHTML = GROUPS.map(g=>{
+    const rows = slices.filter(s=>s.group===g.name);
+    return `<div class="axgroup">
+      <h3 style="color:${g.color}"><span class="swatch" style="background:${g.color}"></span>
+        ${esc(g.name)} <span class="plain" style="color:var(--muted)">· ${g.grade}</span></h3>
       <div class="axlist nums">
-        ${pcts.map(a=>`<div class="r"><span>${esc(a.lab)}${a.inv?" ↓":""}</span>
-          <span class="raw">${a.raw==null ? "—" : a.fmt(a.raw)}</span>
+        ${rows.map(a=>`<div class="r"><span>${esc(a.lab)}${a.inv?" ↓":""}</span>
+          <span class="raw">${a.raw==null?"—":a.fmt(a.raw)}</span>
           <b style="color:${a.pct==null?"var(--muted)":g.color}">${a.pct ?? "—"}</b></div>`).join("")}
-      </div>
-      <p class="cap">${esc(g.note)}</p>
-    </div>`;
+      </div></div>`;
   }).join("");
 
   document.getElementById("notes").innerHTML = `
-    Percentiles rank this player against every <b>${esc(srow.primary_position ?? "")}</b>
-    in the ${esc(srow.league.split("-")[1] ?? srow.league)} over the same span
+    Each wedge is one metric; its length is this player's percentile against every
+    <b>${esc(srow.primary_position ?? "")}</b> in the
+    ${esc(srow.league.split("-")[1] ?? srow.league)} over the same span
     (${pool.length} players with ${MIN_90S_PEER}+ full matches). Rates come from summed
-    totals, so a career view is weighted by minutes rather than averaging seasons equally.
-    Axes marked ↓ are inverted — fewer fouls or cards fills the axis.
-    A radar's <i>shape</i> is readable; its <i>area</i> is not a quantity, since axis
-    order is a design choice. Attack and playmaking measure their construct directly;
-    defensive counts are a far proxy — read them as activity, not quality.`;
+    totals, so a career view is minutes-weighted rather than averaging seasons equally.
+    Wedges marked ↓ are inverted — fewer fouls or cards means a longer wedge.
+    Attack and playmaking measure their construct directly; defensive counts are a
+    far proxy — read them as activity, not quality.`;
 }
 
-// percentile radar: every axis is 0-100, so one shared scale, no unit mixing
-function radarSvg(axes, color){
-  const W=250, H=210, cx=W/2, cy=H/2+4, R=76, N=axes.length;
-  const ang = i => -Math.PI/2 + i*2*Math.PI/N;
-  const at = (i,f) => [cx + R*f*Math.cos(ang(i)), cy + R*f*Math.sin(ang(i))];
+// pizza: one wedge per metric, length = percentile, colour = group.
+// Every wedge is on the same 0-100 scale, so lengths are directly comparable.
+function pizzaSvg(slices){
+  window._slices = slices;   // hover handler reads back by index
+  const S=420, cx=S/2, cy=S/2, R0=34, R1=150, N=slices.length;
+  const step = 2*Math.PI/N, gap = 0.03;
+  const pt = (r,a) => `${(cx+r*Math.cos(a)).toFixed(1)} ${(cy+r*Math.sin(a)).toFixed(1)}`;
+  // annular sector R0->r, angle a0->a1 (clockwise outer, counter-clockwise inner)
+  const wedge = (a0, a1, r, fill, op) =>
+    `<path d="M ${pt(R0,a0)} L ${pt(r,a0)} A ${r} ${r} 0 0 1 ${pt(r,a1)}
+       L ${pt(R0,a1)} A ${R0} ${R0} 0 0 0 ${pt(R0,a0)} Z"
+       fill="${fill}" fill-opacity="${op}"/>`;
   let g = "";
-  for(const f of [.25,.5,.75,1])
-    g += `<polygon fill="none" stroke="var(--grid)" points="${
-      axes.map((_,i)=>at(i,f).map(v=>v.toFixed(1)).join(",")).join(" ")}"/>`;
-  axes.forEach((a,i)=>{
-    const [x,y] = at(i,1);
-    g += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"
-      stroke="var(--grid)"/>`;
-    const [lx,ly] = at(i,1.20);
-    g += `<text x="${lx.toFixed(1)}" y="${(ly+3).toFixed(1)}" text-anchor="middle"
-      font-size="9">${esc(a.lab.replace(" /90",""))}</text>`;
+  // background rings at 25/50/75/100
+  for(const f of [.25,.5,.75,1]){
+    const r = R0 + (R1-R0)*f;
+    g += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--grid)"/>`;
+  }
+  slices.forEach((s,i)=>{
+    const a0 = -Math.PI/2 + i*step + gap, a1 = -Math.PI/2 + (i+1)*step - gap;
+    const mid = (a0+a1)/2;
+    // faint full-length track, then the filled percentile wedge over it
+    g += wedge(a0, a1, R1, s.color, .12);
+    if(s.pct!=null){
+      const r = R0 + (R1-R0)*s.pct/100;
+      g += `<g data-i="${i}" style="cursor:default">${wedge(a0,a1,r,s.color,.85)}</g>`;
+      // percentile number just past the wedge tip
+      const [nx,ny] = [cx+(r+11)*Math.cos(mid), cy+(r+11)*Math.sin(mid)];
+      g += `<text x="${nx.toFixed(1)}" y="${(ny+3).toFixed(1)}" text-anchor="middle"
+        font-size="10" fill="var(--line)" font-weight="700">${s.pct}</text>`;
+    }
+    // radial label, flipped on the left half so it never reads upside-down
+    const deg = mid*180/Math.PI, flip = mid > Math.PI/2 || mid < -Math.PI/2;
+    const lr = R1 + 16, [lx,ly] = [cx+lr*Math.cos(mid), cy+lr*Math.sin(mid)];
+    const rot = flip ? deg+180 : deg;
+    g += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}"
+      text-anchor="${flip?"end":"start"}" dominant-baseline="middle" font-size="9.5"
+      transform="rotate(${rot.toFixed(1)} ${lx.toFixed(1)} ${ly.toFixed(1)})"
+      fill="var(--muted)">${esc(s.lab.replace(" /90",""))}${s.inv?" ↓":""}</text>`;
   });
-  const ok = axes.every(a=>a.pct!=null);
-  if(!ok) return `<svg viewBox="0 0 ${W} ${H}">${g}
-    <text x="${cx}" y="${cy}" text-anchor="middle" font-size="11"
-      fill="var(--muted)">peer pool too small</text></svg>`;
-  const pts = axes.map((a,i)=>at(i, a.pct/100).map(v=>v.toFixed(1)).join(",")).join(" ");
-  g += `<polygon points="${pts}" fill="${color}" fill-opacity=".22"
-    stroke="${color}" stroke-width="2"/>`;
-  g += axes.map((a,i)=>{
-    const [x,y] = at(i, a.pct/100);
-    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="${color}"/>`;
-  }).join("");
-  return `<svg viewBox="0 0 ${W} ${H}" aria-label="Percentile radar">${g}</svg>`;
+  return `<svg viewBox="0 0 ${S} ${S}" id="pizzasvg" aria-label="Percentile profile by metric"
+     onmousemove="pizzaHover(event)" onmouseleave="hidePizza()">${g}</svg>`;
 }
+// hover handlers referenced inline so they survive innerHTML swaps
+window.pizzaHover = e => {
+  const grp = e.target.closest("g[data-i]");
+  if(!grp){ hideTip(); return; }
+  const s = window._slices?.[+grp.dataset.i];
+  if(s) showTip(e, `<div class="t">${esc(s.group)}</div>
+    ${esc(s.lab)}${s.inv?" ↓":""}: <b>${s.fmt(s.raw)}</b> · ${s.pct}th pct`);
+};
+window.hidePizza = () => hideTip();
 </script>
 </body>
 </html>
