@@ -11,6 +11,7 @@ from soccerhub.readers.transfermarkt import (
     fetch_transfermarkt_transfers,
     fetch_transfermarkt_values,
 )
+from soccerhub.readers.understat import fetch_understat
 from soccerhub.pipelines import (
     build_player_season,
     build_player_xref,
@@ -18,6 +19,9 @@ from soccerhub.pipelines import (
     push_club_elo,
     push_club_elo_history,
     push_matches,
+    push_player_xg,
+    push_shots,
+    push_team_match,
     push_to_supabase,
     push_transfers,
     read_hub,
@@ -43,6 +47,10 @@ __all__ = [
     "push_matches",
     "push_club_elo",
     "push_club_elo_history",
+    "push_player_xg",
+    "push_shots",
+    "push_team_match",
+    "fetch_understat",
     "read_hub",
     "run_season",
 ]

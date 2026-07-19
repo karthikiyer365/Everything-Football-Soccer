@@ -114,6 +114,42 @@ jobs:
           print(push_club_elo(force=True))
           "
 
+  understat:
+    needs: seasons  # player-xg updates rows the seasons job just wrote
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        league:
+          - "ENG-Premier League"
+          - "ESP-La Liga"
+          - "GER-Bundesliga"
+          - "ITA-Serie A"
+          - "FRA-Ligue 1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e "Soccer Data Hub"
+      - name: refresh understat xg (player, team-match, shots)
+        working-directory: Soccer Data Hub
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # read side of player-xg matching; key is public by design (in site JS)
+          SUPABASE_PUBLISHABLE_KEY: "sb_publishable_Qy0bJ4CdrxffuJGNq12ebw_r0-Z3qD-"
+          LEAGUE: ${{ matrix.league }}
+        run: |
+          python -c "
+          import os
+          from soccerhub import push_player_xg, push_shots, push_team_match
+          lg, ss = os.environ['LEAGUE'], os.environ['SEASON']
+          print('player_xg', push_player_xg(lg, ss, force=True))
+          print('team_match', push_team_match(lg, ss, force=True))
+          print('shots', push_shots(lg, ss, force=True))
+          "
+
   age-curve:
     needs: seasons  # derived from player_season — run after it refreshes
     runs-on: ubuntu-latest

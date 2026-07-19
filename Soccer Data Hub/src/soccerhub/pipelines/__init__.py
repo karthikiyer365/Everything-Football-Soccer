@@ -17,6 +17,9 @@ __all__ = [
     "push_matches",
     "push_club_elo",
     "push_club_elo_history",
+    "push_player_xg",
+    "push_shots",
+    "push_team_match",
     "read_hub",
     "run_season",
 ]
@@ -24,8 +27,11 @@ __all__ = [
 XREF_CONFLICT_KEY = "league,season,team,fbref_name"
 TRANSFERS_CONFLICT_KEY = "tm_id,transfer_date"  # matches 0002 PK
 AGE_CURVE_CONFLICT_KEY = "primary_position,age"  # matches 0005 PK
-MATCHES_CONFLICT_KEY = "league,season,date,home_team,away_team"  # matches 0007 PK
-CLUB_ELO_CONFLICT_KEY = "team,league,snapshot_date"  # matches 0008 PK
+MATCHES_CONFLICT_KEY = "league,season,date,home_team,away_team"  # matches 0006 PK
+CLUB_ELO_CONFLICT_KEY = "team,league,snapshot_date"  # matches 0007 PK
+CONFLICT_KEY_PLAYER_SEASON = "league,season,team,player_name"  # matches 0001 PK
+TEAM_MATCH_CONFLICT_KEY = "league,season,game_id"  # matches 0009 PK
+SHOTS_CONFLICT_KEY = "league,season,shot_id"  # matches 0010 PK
 BIG5 = {"ENG-Premier League", "ESP-La Liga", "GER-Bundesliga",
         "ITA-Serie A", "FRA-Ligue 1"}
 
@@ -147,3 +153,12 @@ def run_season(
     manifest = build_player_season(league, season, force=force, refetch=force)
     push_to_supabase(manifest, table)
     return manifest
+
+
+# bottom import on purpose: understat.py reads this package's CONFLICT_KEY
+# constants at call time, so importing it here is cycle-free
+from soccerhub.pipelines.understat import (  # noqa: E402
+    push_player_xg,
+    push_shots,
+    push_team_match,
+)
