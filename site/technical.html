@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Technical Profile — SoccerHub</title>
+<meta name="description" content="Every shot a player has taken, plus attacking, playmaking and defensive profiles ranked against positional peers.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<style>
+  :root{
+    --grass:#122b1a; --grass-lt:#16321f; --card:#0a1a0e;
+    --line:#f2f5ef; --muted:#9fb69c; --tag:#8fae8b; --border:rgba(242,245,239,.22);
+    --amber:#ffb43a; --green:#8fd18a; --chalk-y:#e8d47a; --blue:#5aa9f0;
+    --red:#e0524a; --grid:rgba(242,245,239,.10); --axis:rgba(242,245,239,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:
+       repeating-linear-gradient(0deg,var(--grass) 0 72px,var(--grass-lt) 72px 144px);
+       color:var(--line);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+       min-height:100vh}
+  .disp{font-family:"Avenir Next Condensed","Arial Narrow","Helvetica Neue Condensed",Impact,sans-serif;
+        text-transform:uppercase;letter-spacing:.04em;font-stretch:condensed}
+  .nums{font-variant-numeric:tabular-nums}
+  a{color:var(--chalk-y)}
+
+  .top{position:sticky;top:0;z-index:5;display:flex;gap:16px;align-items:center;
+       padding:12px 20px;background:rgba(5,14,8,.92);backdrop-filter:blur(4px);
+       border-bottom:1px solid var(--border)}
+  .top a.home{color:var(--line);text-decoration:none;font-size:1.05rem;white-space:nowrap}
+  .searchwrap{position:relative;flex:1;max-width:420px}
+  #search{width:100%;padding:9px 14px;border-radius:999px;border:1px solid var(--border);
+       background:var(--card);color:var(--line);font:inherit;font-size:.95rem}
+  #search::placeholder{color:var(--tag)}
+  #search:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+  #results{position:absolute;top:110%;left:0;right:0;background:var(--card);
+       border:1px solid var(--border);border-radius:6px;overflow:hidden auto;display:none;
+       max-height:320px;z-index:7}
+  #results button{display:flex;justify-content:space-between;gap:12px;width:100%;
+       padding:10px 14px;border:0;background:none;color:var(--line);font:inherit;
+       font-size:.9rem;text-align:left;cursor:pointer}
+  #results button:hover,#results button:focus-visible{background:rgba(255,180,58,.12);outline:none}
+  #results .sub{color:var(--tag);font-size:.8rem;white-space:nowrap}
+  .top .xlink{color:var(--muted);font-size:.85rem;text-decoration:none;white-space:nowrap}
+  .top .xlink:hover{color:var(--chalk-y)}
+
+  main{max-width:1120px;margin:0 auto;padding:24px 20px 80px}
+  .empty{color:var(--muted);text-align:center;padding:80px 20px;max-width:48ch;margin:0 auto}
+  .empty .disp{color:var(--line);font-size:1.6rem}
+
+  .hero{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 18px;margin:4px 0 12px}
+  .hero h1{font-size:clamp(1.8rem,5vw,2.7rem);margin:0;line-height:1}
+  .hero .meta{color:var(--muted);font-size:.92rem}
+
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+  .chips button{border:1px solid var(--border);background:var(--card);color:var(--muted);
+       border-radius:999px;padding:4px 12px;font:inherit;font-size:.8rem;cursor:pointer}
+  .chips button[aria-pressed="true"]{background:var(--amber);color:#20160a;
+       border-color:var(--amber);font-weight:700}
+  .chips button:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+
+  .box{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px}
+  .box h2{margin:0 0 10px;font-size:.8rem;letter-spacing:.16em;
+        text-transform:uppercase;color:var(--tag);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .box h2 .plain{color:var(--muted);letter-spacing:0;text-transform:none}
+  .box p.cap{margin:10px 0 0;font-size:12px;color:var(--muted)}
+  .swatch{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .chartbox svg{width:100%;height:auto;display:block}
+  svg text{font:10px system-ui;fill:var(--axis)}
+
+  .shotrow{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start}
+  @media(max-width:900px){.shotrow{grid-template-columns:1fr}}
+  .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .stat{background:rgba(242,245,239,.04);border-radius:5px;padding:9px 11px}
+  .stat label{display:block;font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+  .stat b{font-size:19px}
+  .stat .s{font-size:11px;color:var(--muted)}
+  .split{margin-top:12px;font-size:12.5px}
+  .split .r{display:grid;grid-template-columns:78px 1fr 46px;gap:8px;align-items:center;margin:5px 0}
+  .split .r span:first-child{color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.08em}
+  .split .track{height:8px;border-radius:4px;background:rgba(242,245,239,.12);overflow:hidden}
+  .split .fill{height:100%;border-radius:4px;background:var(--blue)}
+  .split .r b{text-align:right;font-weight:600}
+
+  .radars{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
+  @media(max-width:900px){.radars{grid-template-columns:1fr}}
+  .axlist{margin-top:10px;font-size:11.5px}
+  .axlist .r{display:grid;grid-template-columns:1fr 52px 30px;gap:6px;padding:3px 0;
+       border-top:1px solid rgba(242,245,239,.07)}
+  .axlist .r span:first-child{color:var(--muted)}
+  .axlist .r .raw{text-align:right;color:var(--muted)}
+  .axlist .r b{text-align:right}
+
+  #tip{position:fixed;z-index:9;pointer-events:none;display:none;background:#050e08;
+       border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-size:.8rem;
+       color:var(--line);box-shadow:0 4px 16px rgba(0,0,0,.5);max-width:230px}
+  #tip .t{color:var(--tag);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
+  .note{margin-top:18px;font-size:12px;color:var(--muted);line-height:1.6}
+</style>
+</head>
+<body>
+<nav class="top">
+  <a class="home disp" href="index.html">⚽ SoccerHub</a>
+  <div class="searchwrap">
+    <input id="search" type="search" placeholder="Search any player, 2014–2025…"
+           autocomplete="off" aria-label="Search player">
+    <div id="results" role="listbox"></div>
+  </div>
+  <a class="xlink" id="cardlink" href="player.html" hidden>value card →</a>
+</nav>
+
+<main id="main">
+  <div class="empty">
+    <p class="disp">Technical profile</p>
+    <p>Every shot a player has taken since 2014, plus attacking, playmaking and
+       defensive profiles ranked against players in the same position.</p>
+  </div>
+</main>
+<div id="tip" role="status"></div>
+
+<script>
+const SUPABASE_URL = "https://rgnzemkdldohplwbxxwy.supabase.co";
+const ANON_KEY = "sb_publishable_Qy0bJ4CdrxffuJGNq12ebw_r0-Z3qD-";
+const XG_SINCE = 2014;          // Understat coverage starts 2014-15
+const MIN_90S_PEER = 10;        // ~900 minutes before a peer can be ranked
+const MIN_SHOTS_MAP = 20;       // below this a shot map is anecdote, not pattern
+
+async function hub(table, params){
+  const q = new URLSearchParams(params);
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${q}`, {headers:{apikey: ANON_KEY}});
+  if(!r.ok) throw new Error(`${table}: ${r.status}`);
+  return r.json();
+}
+// Supabase caps every response at 1000 rows regardless of limit
+async function hubAll(table, params){
+  const PAGE = 1000, rows = [];
+  for(let offset = 0;; offset += PAGE){
+    const page = await hub(table, {...params, limit:String(PAGE), offset:String(offset)});
+    rows.push(...page);
+    if(page.length < PAGE) return rows;
+  }
+}
+const esc = s => String(s).replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const tipEl = () => document.getElementById("tip");
+const showTip = (e, html) => { const t=tipEl(); t.innerHTML=html; t.style.display="block";
+  t.style.left=Math.min(e.clientX+14, innerWidth-244)+"px"; t.style.top=(e.clientY+14)+"px"; };
+const hideTip = () => tipEl().style.display="none";
+
+/* ---------- radar metric definitions ----------
+   Each axis: want -> proxy -> grade. Rates are per 90, computed from summed
+   totals so a career view is minutes-weighted rather than an average of
+   averages. `inv:true` means lower raw value is better, so the percentile is
+   flipped and a full axis always reads "good".                              */
+const GROUPS = [
+  {name:"Attack", color:"var(--amber)", grade:"direct",
+   note:"Understat's xG model; shot volume is team-dependent.",
+   axes:[
+     {k:"npxg90",  lab:"npxG /90",   fmt:v=>v.toFixed(2)},
+     {k:"sh90",    lab:"Shots /90",  fmt:v=>v.toFixed(2)},
+     {k:"xgsh",    lab:"xG /shot",   fmt:v=>v.toFixed(3)},
+     {k:"npg90",   lab:"npGoals /90",fmt:v=>v.toFixed(2)},
+   ]},
+  {name:"Playmaking", color:"var(--blue)", grade:"direct",
+   note:"xGBuildup credits every player in a possession equally — it measures involvement, not the quality of the contribution.",
+   axes:[
+     {k:"xa90",    lab:"xA /90",       fmt:v=>v.toFixed(2)},
+     {k:"kp90",    lab:"Key passes /90",fmt:v=>v.toFixed(2)},
+     {k:"chain90", lab:"xGChain /90",  fmt:v=>v.toFixed(2)},
+     {k:"build90", lab:"xGBuildup /90",fmt:v=>v.toFixed(2)},
+   ]},
+  {name:"Defense & discipline", color:"var(--green)", grade:"far",
+   note:"Volume, not quality: a dominant team's defender simply defends less, and the best defending — being positioned so nothing happens — leaves no event to count.",
+   axes:[
+     {k:"tkl90",   lab:"Tackles won /90", fmt:v=>v.toFixed(2)},
+     {k:"int90",   lab:"Interceptions /90",fmt:v=>v.toFixed(2)},
+     {k:"foul90",  lab:"Fouls /90",       fmt:v=>v.toFixed(2), inv:true},
+     {k:"card90",  lab:"Cards /90",       fmt:v=>v.toFixed(2), inv:true},
+   ]},
+];
+
+// season rows -> per-90 rates off summed totals (minutes-weighted).
+// Each rate divides by the minutes of the rows that actually carry the stat:
+// a season with no Understat match has null xG but real minutes, and counting
+// those minutes would silently understate every xG rate for that career.
+function rates(rows){
+  const n90All = rows.reduce((a,r)=>a+(r.nineties ?? 0), 0);
+  if(!n90All) return null;
+  const per90 = k => {
+    let num = 0, den = 0;
+    for(const r of rows) if(r[k]!=null){ num += r[k]; den += r.nineties ?? 0; }
+    return den ? num/den : null;
+  };
+  const sum = k => rows.reduce((a,r)=>a+(r[k] ?? 0), 0);
+  const shots = sum("shots"), npxg = sum("np_xg");
+  const cards = rows.some(r=>r.yellow_cards!=null)
+    ? per90("yellow_cards")+(per90("red_cards") ?? 0) : null;
+  return {
+    n90: n90All,
+    npxg90:  per90("np_xg"),
+    sh90:    per90("shots"),
+    xgsh:    shots ? npxg/shots : null,
+    npg90:   per90("non_penalty_goals"),
+    xa90:    per90("xa"),
+    kp90:    per90("key_passes"),
+    chain90: per90("xg_chain"),
+    build90: per90("xg_buildup"),
+    tkl90:   per90("tackles_won"),
+    int90:   per90("interceptions"),
+    foul90:  per90("fouls_committed"),
+    card90:  cards,
+  };
+}
+
+// midrank percentile: a pool tied on a value reads 50, not 0
+function pctOf(vals, v){
+  if(v==null || vals.length < 8) return null;
+  const s = [...vals].sort((a,b)=>a-b);
+  let lo=0, hi=s.length;
+  while(lo<hi){ const m=(lo+hi)>>1; if(s[m]<v) lo=m+1; else hi=m; }
+  let up=lo, hi2=s.length;
+  while(up<hi2){ const m=(up+hi2)>>1; if(s[m]<=v) up=m+1; else hi2=m; }
+  const mid = lo + Math.max(up-lo-1,0)/2;
+  return Math.round(100*mid/Math.max(s.length-1,1));
+}
+
+/* ---------- search (same contract as the value card) ---------- */
+const box = document.getElementById("search");
+const list = document.getElementById("results");
+let deb;
+box.addEventListener("input", () => {
+  clearTimeout(deb);
+  const q = box.value.trim();
+  if(q.length < 3){ list.style.display = "none"; return; }
+  deb = setTimeout(() => runSearch(q), 300);
+});
+document.addEventListener("click", e => {
+  if(!e.target.closest(".searchwrap")) list.style.display = "none";
+});
+async function runSearch(q){
+  const rows = await hub("player_season", {
+    select:"player_name,tm_id,team,season", player_name:`ilike.*${q}*`,
+    season:`gte.${XG_SINCE}`, order:"season.desc", limit:"60"});
+  const seen = new Set(); const picks = [];
+  for(const r of rows){
+    const key = r.tm_id ?? `name:${r.player_name}`;
+    if(seen.has(key) || r.tm_id==null) continue;
+    seen.add(key); picks.push(r);
+    if(picks.length === 8) break;
+  }
+  list.innerHTML = picks.length ? "" : "<button disabled>No players found</button>";
+  for(const p of picks){
+    const b = document.createElement("button");
+    b.setAttribute("role","option");
+    b.innerHTML = `<span>${esc(p.player_name)}</span>
+       <span class="sub">${esc(p.team)} · ${esc(p.season)}</span>`;
+    b.onclick = () => {
+      list.style.display = "none"; box.value = "";
+      const u = new URL(location); u.search = `?tm=${p.tm_id}`;
+      history.pushState({}, "", u); load();
+    };
+    list.appendChild(b);
+  }
+  list.style.display = "block";
+}
+
+/* ---------- load ---------- */
+window.addEventListener("popstate", load);
+load();
+
+const peerCache = new Map();
+let career = [], shots = [], srow = null;
+
+async function load(){
+  const u = new URLSearchParams(location.search);
+  const main = document.getElementById("main");
+  if(!u.has("tm")) return;
+  main.innerHTML = `<div class="empty">Loading…</div>`;
+  const tm = u.get("tm");
+  const link = document.getElementById("cardlink");
+  link.href = `player.html?tm=${encodeURIComponent(tm)}`; link.hidden = false;
+
+  try{
+    career = await hub("player_season", {select:"*", tm_id:`eq.${tm}`,
+      season:`gte.${XG_SINCE}`, order:"season"});
+  }catch(e){
+    main.innerHTML = `<div class="empty">Could not reach the database (${esc(e.message)}).</div>`;
+    return;
+  }
+  if(!career.length){
+    main.innerHTML = `<div class="empty">No seasons from ${XG_SINCE} on for this player —
+      xG data only exists from ${XG_SINCE}-15.</div>`;
+    return;
+  }
+  srow = career[career.length-1];
+  const uid = [...career].reverse().find(r=>r.understat_id!=null)?.understat_id;
+  shots = [];
+  if(uid!=null){
+    try{ shots = await hubAll("shots_understat",
+      {select:"season,date,team,xg,location_x,location_y,body_part,situation,result,minute",
+       player_id:`eq.${uid}`, order:"date"}); }
+    catch(e){ /* map degrades to a stated gap */ }
+  }
+  render();
+}
+
+const sel = () => {
+  const s = new URLSearchParams(location.search).get("s");
+  return career.some(r=>r.season===s) ? s : "career";
+};
+function setSeason(s){
+  const u = new URL(location);
+  u.search = `?tm=${new URLSearchParams(location.search).get("tm")}` +
+             (s==="career" ? "" : `&s=${s}`);
+  history.pushState({}, "", u); render();
+}
+
+async function peerPool(league, pos, season){
+  const key = `${league}|${pos}|${season}`;
+  if(!peerCache.has(key)){
+    const params = {select:"player_name,tm_id,nineties,np_xg,non_penalty_goals,shots,xa," +
+      "key_passes,xg_chain,xg_buildup,tackles_won,interceptions,fouls_committed," +
+      "yellow_cards,red_cards", league:`eq.${league}`, primary_position:`eq.${pos}`};
+    params.season = season==="career" ? `gte.${XG_SINCE}` : `eq.${season}`;
+    peerCache.set(key, hubAll("player_season", params).then(rows=>{
+      // career mode ranks whole careers, so peers are aggregated the same way.
+      // Key on tm_id — two players can share a name, and merging them would
+      // invent a peer with nobody's real rates.
+      const byPlayer = new Map();
+      for(const r of rows){
+        const k = r.tm_id ?? `name:${r.player_name}`;
+        if(!byPlayer.has(k)) byPlayer.set(k, []);
+        byPlayer.get(k).push(r);
+      }
+      const out = [];
+      for(const rs of byPlayer.values()){
+        const q = rates(rs);
+        if(q && q.n90 >= MIN_90S_PEER) out.push(q);
+      }
+      return out;
+    }));
+  }
+  return peerCache.get(key);
+}
+
+/* ---------- render ---------- */
+async function render(){
+  const s = sel();
+  const rows = s==="career" ? career : career.filter(r=>r.season===s);
+  const mine = rates(rows);
+  const seasons = [...new Set(career.map(r=>r.season))];
+  const shotRows = s==="career" ? shots : shots.filter(r=>r.season===s);
+  const span = `${seasons[0]}–${seasons[seasons.length-1]}`;
+  document.title = `${srow.player_name} — technical profile`;
+
+  document.getElementById("main").innerHTML = `
+  <header class="hero">
+    <h1 class="disp">${esc(srow.player_name)}</h1>
+    <span class="meta">${esc(srow.primary_position ?? "")} · ${esc(srow.team)} ·
+      ${esc(srow.league.split("-")[1] ?? srow.league)} ·
+      ${s==="career" ? `${span} (${seasons.length} seasons)` : esc(s)}</span>
+  </header>
+  <div class="chips nums" id="chips">
+    <button data-s="career" aria-pressed="${s==="career"}">Career</button>
+    ${seasons.map(x=>`<button data-s="${esc(x)}" aria-pressed="${x===s}">${esc(x)}</button>`).join("")}
+  </div>
+
+  <div class="shotrow">
+    <div class="box">
+      <h2>Shot map
+        <span class="plain">· <span class="swatch" style="background:var(--amber)"></span> goal
+        · <span class="swatch" style="background:rgba(242,245,239,.35)"></span> no goal
+        · dot size = xG</span></h2>
+      <div class="chartbox" id="pitch"></div>
+      <p class="cap" id="pitchcap"></p>
+    </div>
+    <div class="box">
+      <h2>Shot profile</h2>
+      <div id="shotstats"></div>
+    </div>
+  </div>
+
+  <div class="radars" id="radars"></div>
+
+  <p class="note" id="notes"></p>`;
+
+  document.getElementById("chips").addEventListener("click", e=>{
+    const v = e.target.dataset?.s; if(v) setSeason(v);
+  });
+
+  drawPitch(shotRows);
+  drawShotStats(shotRows, mine);
+  await drawRadars(mine, s);
+}
+
+/* ---------- shot map ---------- */
+// Understat coords are normalised: location_x 1.0 = opponent goal line,
+// location_y 0.5 = centre. Drawn as a vertical attacking third, goal at top.
+const PITCH = {W:520, H:440, X0:0.55};   // show from 55% of pitch length up
+const px = ly => 30 + (PITCH.W-60) * ly;
+// ~0.4% of shots come from deeper than the drawn area (halfway-line efforts);
+// pin them to the bottom edge so they stay countable instead of rendering
+// off-canvas, and mark them so the position isn't read as literal
+const py = lx => PITCH.H - 26 -
+  (PITCH.H-56) * Math.max(0, (lx - PITCH.X0)/(1 - PITCH.X0));
+const offMap = lx => lx < PITCH.X0;
+
+function drawPitch(rows){
+  const el = document.getElementById("pitch");
+  const L = (x1,y1,x2,y2) => `<line x1="${px(y1).toFixed(1)}" y1="${py(x1).toFixed(1)}"
+    x2="${px(y2).toFixed(1)}" y2="${py(x2).toFixed(1)}" stroke="var(--axis)"
+    stroke-opacity=".45" stroke-width="1.5"/>`;
+  // metric marks converted to Understat's normalised space (105m x 68m)
+  const boxX = 1-16.5/105, sixX = 1-5.5/105, spotX = 1-11/105;
+  const boxY0 = .5-20.16/68, boxY1 = .5+20.16/68;
+  const sixY0 = .5-9.16/68,  sixY1 = .5+9.16/68;
+  const goalY0 = .5-3.66/68, goalY1 = .5+3.66/68;
+  const lines = `
+    ${L(1,0,1,1)}${L(PITCH.X0,0,PITCH.X0,1)}${L(PITCH.X0,0,1,0)}${L(PITCH.X0,1,1,1)}
+    ${L(boxX,boxY0,boxX,boxY1)}${L(boxX,boxY0,1,boxY0)}${L(boxX,boxY1,1,boxY1)}
+    ${L(sixX,sixY0,sixX,sixY1)}${L(sixX,sixY0,1,sixY0)}${L(sixX,sixY1,1,sixY1)}
+    <line x1="${px(goalY0)}" y1="${py(1)-3}" x2="${px(goalY1)}" y2="${py(1)-3}"
+      stroke="var(--line)" stroke-opacity=".8" stroke-width="3"/>
+    <circle cx="${px(.5)}" cy="${py(spotX)}" r="2" fill="var(--axis)"/>`;
+
+  if(!rows.length){
+    el.innerHTML = `<svg viewBox="0 0 ${PITCH.W} ${PITCH.H}">${lines}
+      <text x="${PITCH.W/2}" y="${PITCH.H/2}" text-anchor="middle" font-size="13"
+        fill="var(--muted)">no shots on record</text></svg>`;
+    document.getElementById("pitchcap").textContent =
+      "Understat records no shots here — keepers and unmatched players show empty.";
+    return;
+  }
+  // goals drawn last so they sit above the misses
+  const ordered = [...rows].sort((a,b)=>(a.result==="Goal") - (b.result==="Goal"));
+  const dots = ordered.map((r,i)=>{
+    const goal = r.result === "Goal";
+    // area ~ xG, so a 0.4 chance looks twice a 0.1 rather than sixteen times
+    const rad = 3 + Math.sqrt(Math.max(r.xg,0)) * 13;
+    const off = offMap(r.location_x);
+    return `<circle data-i="${rows.indexOf(r)}" cx="${px(r.location_y).toFixed(1)}"
+      cy="${py(r.location_x).toFixed(1)}" r="${rad.toFixed(1)}"
+      fill="${goal ? "var(--amber)" : "rgba(242,245,239,.30)"}"
+      stroke="${goal ? "#20160a" : "rgba(242,245,239,.45)"}" stroke-width="${goal?1.5:1}"
+      ${off ? 'stroke-dasharray="2 2"' : ""}
+      ${goal?'':'fill-opacity=".75"'}/>`;
+  }).join("");
+  el.innerHTML = `<svg viewBox="0 0 ${PITCH.W} ${PITCH.H}" id="pitchsvg"
+     aria-label="Shot map: every shot with goals highlighted">${lines}${dots}</svg>`;
+
+  const goals = rows.filter(r=>r.result==="Goal").length;
+  const xgSum = rows.reduce((a,r)=>a+r.xg,0);
+  const off = rows.filter(r=>offMap(r.location_x)).length;
+  document.getElementById("pitchcap").innerHTML =
+    `${rows.length} shots · ${goals} goals · ${xgSum.toFixed(1)} xG` +
+    (rows.length < MIN_SHOTS_MAP
+      ? ` — <span style="color:var(--chalk-y)">too few shots to read a pattern from
+         placement</span>.`
+      : `. Penalties sit on the spot.`) +
+    (off ? ` ${off} shot${off>1?"s":""} from deeper than the drawn area
+       ${off>1?"are":"is"} pinned to the bottom edge (dashed).` : "");
+
+  const svg = document.getElementById("pitchsvg");
+  svg.addEventListener("mousemove", e=>{
+    const c = e.target.closest("circle[data-i]");
+    if(!c){ hideTip(); return; }
+    const r = rows[+c.dataset.i];
+    showTip(e, `<div class="t">${esc(r.date)} · ${esc(r.team)}</div>
+      ${esc(r.result)} · ${r.xg.toFixed(3)} xG<br>
+      ${esc(r.situation ?? "Penalty")} · ${esc(r.body_part ?? "?")} · ${r.minute}'`);
+  });
+  svg.addEventListener("mouseleave", hideTip);
+}
+
+/* ---------- shot profile stats ---------- */
+// pitch geometry in normalised units, for distance and in-box shares
+const DIST = r => Math.hypot((1-r.location_x)*105, (r.location_y-.5)*68);
+const IN_BOX = r => r.location_x >= 1-16.5/105
+  && r.location_y >= .5-20.16/68 && r.location_y <= .5+20.16/68;
+
+function drawShotStats(rows, mine){
+  const el = document.getElementById("shotstats");
+  if(!rows.length){ el.innerHTML = `<p class="cap">No shot-level data.</p>`; return; }
+  const n = rows.length;
+  const goals = rows.filter(r=>r.result==="Goal").length;
+  const onT = rows.filter(r=>["Goal","Saved Shot"].includes(r.result)).length;
+  const pens = rows.filter(r=>r.situation==null).length;   // Understat leaves it null
+  const xgSum = rows.reduce((a,r)=>a+r.xg,0);
+  const npRows = rows.filter(r=>r.situation!=null);
+  const avgDist = npRows.reduce((a,r)=>a+DIST(r),0)/Math.max(npRows.length,1);
+  const inBox = npRows.filter(IN_BOX).length;
+
+  const share = (label, part, whole, color) => `
+    <div class="r"><span>${label}</span>
+      <span class="track"><span class="fill" style="width:${whole?100*part/whole:0}%;
+        background:${color}"></span></span>
+      <b>${whole?Math.round(100*part/whole):0}%</b></div>`;
+  const foot = k => npRows.filter(r=>r.body_part===k).length;
+  const head = npRows.filter(r=>r.body_part==="Head").length;
+  const openPlay = npRows.filter(r=>r.situation==="Open Play").length;
+
+  el.innerHTML = `
+    <div class="statgrid nums">
+      <div class="stat"><label>Shots</label><b>${n}</b>
+        <div class="s">${pens} penalt${pens===1?"y":"ies"}</div></div>
+      <div class="stat"><label>Goals</label><b>${goals}</b>
+        <div class="s">${xgSum.toFixed(1)} xG total</div></div>
+      <div class="stat"><label>On target</label><b>${Math.round(100*onT/n)}%</b>
+        <div class="s">of all shots</div></div>
+      <div class="stat"><label>Avg distance</label><b>${avgDist.toFixed(1)}m</b>
+        <div class="s">non-penalty</div></div>
+    </div>
+    <div class="split">
+      ${share("In the box", inBox, npRows.length, "var(--green)")}
+      ${share("Open play", openPlay, npRows.length, "var(--blue)")}
+      ${share("Right foot", foot("Right Foot"), npRows.length, "var(--chalk-y)")}
+      ${share("Left foot", foot("Left Foot"), npRows.length, "var(--chalk-y)")}
+      ${share("Head", head, npRows.length, "var(--amber)")}
+    </div>`;
+}
+
+/* ---------- radars ---------- */
+async function drawRadars(mine, season){
+  const el = document.getElementById("radars");
+  if(!mine){ el.innerHTML = `<div class="box"><p class="cap">No minutes in this
+    selection.</p></div>`; return; }
+  el.innerHTML = GROUPS.map(g=>`<div class="box"><h2>${esc(g.name)}</h2>
+    <div class="chartbox" id="radar-${g.name.split(" ")[0]}">
+      <p class="cap">Ranking…</p></div></div>`).join("");
+
+  let pool;
+  try{ pool = await peerPool(srow.league, srow.primary_position, season); }
+  catch(e){ el.innerHTML = `<div class="box"><p class="cap">Could not load the peer
+    pool (${esc(e.message)}).</p></div>`; return; }
+
+  el.innerHTML = GROUPS.map(g=>{
+    const pcts = g.axes.map(a=>{
+      const raw = mine[a.k];
+      const p = raw==null ? null
+        : pctOf(pool.map(q=>q[a.k]).filter(v=>v!=null), raw);
+      return {...a, raw, pct: p==null ? null : (a.inv ? 100-p : p)};
+    });
+    return `<div class="box">
+      <h2>${esc(g.name)} <span class="plain">· ${g.grade} measure</span></h2>
+      <div class="chartbox">${radarSvg(pcts, g.color)}</div>
+      <div class="axlist nums">
+        ${pcts.map(a=>`<div class="r"><span>${esc(a.lab)}${a.inv?" ↓":""}</span>
+          <span class="raw">${a.raw==null ? "—" : a.fmt(a.raw)}</span>
+          <b style="color:${a.pct==null?"var(--muted)":g.color}">${a.pct ?? "—"}</b></div>`).join("")}
+      </div>
+      <p class="cap">${esc(g.note)}</p>
+    </div>`;
+  }).join("");
+
+  document.getElementById("notes").innerHTML = `
+    Percentiles rank this player against every <b>${esc(srow.primary_position ?? "")}</b>
+    in the ${esc(srow.league.split("-")[1] ?? srow.league)} over the same span
+    (${pool.length} players with ${MIN_90S_PEER}+ full matches). Rates come from summed
+    totals, so a career view is weighted by minutes rather than averaging seasons equally.
+    Axes marked ↓ are inverted — fewer fouls or cards fills the axis.
+    A radar's <i>shape</i> is readable; its <i>area</i> is not a quantity, since axis
+    order is a design choice. Attack and playmaking measure their construct directly;
+    defensive counts are a far proxy — read them as activity, not quality.`;
+}
+
+// percentile radar: every axis is 0-100, so one shared scale, no unit mixing
+function radarSvg(axes, color){
+  const W=250, H=210, cx=W/2, cy=H/2+4, R=76, N=axes.length;
+  const ang = i => -Math.PI/2 + i*2*Math.PI/N;
+  const at = (i,f) => [cx + R*f*Math.cos(ang(i)), cy + R*f*Math.sin(ang(i))];
+  let g = "";
+  for(const f of [.25,.5,.75,1])
+    g += `<polygon fill="none" stroke="var(--grid)" points="${
+      axes.map((_,i)=>at(i,f).map(v=>v.toFixed(1)).join(",")).join(" ")}"/>`;
+  axes.forEach((a,i)=>{
+    const [x,y] = at(i,1);
+    g += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"
+      stroke="var(--grid)"/>`;
+    const [lx,ly] = at(i,1.20);
+    g += `<text x="${lx.toFixed(1)}" y="${(ly+3).toFixed(1)}" text-anchor="middle"
+      font-size="9">${esc(a.lab.replace(" /90",""))}</text>`;
+  });
+  const ok = axes.every(a=>a.pct!=null);
+  if(!ok) return `<svg viewBox="0 0 ${W} ${H}">${g}
+    <text x="${cx}" y="${cy}" text-anchor="middle" font-size="11"
+      fill="var(--muted)">peer pool too small</text></svg>`;
+  const pts = axes.map((a,i)=>at(i, a.pct/100).map(v=>v.toFixed(1)).join(",")).join(" ");
+  g += `<polygon points="${pts}" fill="${color}" fill-opacity=".22"
+    stroke="${color}" stroke-width="2"/>`;
+  g += axes.map((a,i)=>{
+    const [x,y] = at(i, a.pct/100);
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="${color}"/>`;
+  }).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" aria-label="Percentile radar">${g}</svg>`;
+}
+</script>
+</body>
+</html>
