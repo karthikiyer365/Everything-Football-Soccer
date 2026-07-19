@@ -254,7 +254,8 @@ async function load(){
       hub("player_season", {
         select: "player_name,team,minutes,starts,matches_played,nineties," +
                 "non_penalty_goals_assists_per90,market_value_in_eur," +
-                "tackles_interceptions_per90,save_pct,clean_sheet_pct,goals_against",
+                "tackles_interceptions_per90,save_pct,clean_sheet_pct,goals_against," +
+                "np_xg,xa",
         league: `eq.${srow.league}`, season: `eq.${season}`,
         primary_position: `eq.${srow.primary_position}`, minutes: `gte.${MIN_MINUTES}`}),
       hub("age_curve", {select: "age,avg_value_eur",
@@ -290,6 +291,9 @@ function pctsOf(pool, key){
 }
 const startShare = r => r.matches_played ? (r.starts||0)/r.matches_played : null;
 const conceded90 = r => r.nineties && r.goals_against!=null ? r.goals_against/r.nineties : null;
+// expected output per 90 — the process behind npG+A/90 (Understat, 2014+)
+const npxga90 = r => r.nineties && r.np_xg!=null
+  ? (r.np_xg + (r.xa ?? 0)) / r.nineties : null;
 // league seasons: 34 games in the Bundesliga, 38 everywhere else in the big five
 const availability = r => Math.min(1, (r.minutes||0) /
   ((r.league?.startsWith("GER") ? 34 : 38) * 90));
@@ -311,11 +315,12 @@ const METRIC = {
 function cardModel(srow, peers){
   const metric = METRIC[srow.primary_position] ?? METRIC.FW;
   const pool = peers.map(p=>({...p, start_share: startShare(p),
-    conceded90: conceded90(p)}));
-  const me = {...srow, start_share: startShare(srow), conceded90: conceded90(srow)};
+    conceded90: conceded90(p), npxga90: npxga90(p)}));
+  const me = {...srow, start_share: startShare(srow), conceded90: conceded90(srow),
+    npxga90: npxga90(srow)};
   const pct = {};
   for(const k of [metric.key, "minutes", "start_share", "market_value_in_eur",
-                  "clean_sheet_pct"])
+                  "clean_sheet_pct", "npxga90"])
     pct[k] = pctsOf(pool, k)(me[k]);
   // fewer goals conceded = better: invert so a full bar means good
   const c = pctsOf(pool, "conceded90")(me.conceded90);
@@ -336,7 +341,11 @@ function cardModel(srow, peers){
                                    {chip:"FAIR VALUE", color:"var(--chalk-y)", gap};
   }
   if(metric.note) verdict.ceiling = metric.note;
-  return {pct, verdict, pool, me, metric};
+  // finishing = outcome minus process. One season of it is mostly variance
+  // (it stabilises over careers, not months) — labelled, never ranked.
+  const overP = srow.non_penalty_goals!=null && srow.np_xg!=null
+    ? srow.non_penalty_goals - srow.np_xg : null;
+  return {pct, verdict, pool, me, metric, overP};
 }
 
 /* ---------- render ---------- */
@@ -399,6 +408,8 @@ function render(rows, moves, srow, peers, seasons, curve = []){
       </div>
       ${bar(m.metric.label, m.pct[m.metric.key], "var(--green)",
             m.metric.fmt(srow[m.metric.key]))}
+      ${m.pct.npxga90!=null ? bar("npxG+xA /90", m.pct.npxga90, "var(--chalk-y)",
+            m.me.npxga90.toFixed(2)) : ""}
       ${srow.primary_position === "GK" ? `
       ${bar("Clean sheet %", m.pct.clean_sheet_pct, "var(--green)",
             srow.clean_sheet_pct!=null ? srow.clean_sheet_pct.toFixed(1)+"%" : null)}
@@ -419,7 +430,9 @@ function render(rows, moves, srow, peers, seasons, curve = []){
             : `${srow.goals??0} + ${srow.assists??0}`}</b></div>
         <div><label>Value</label><b>${eur(srow.market_value_in_eur)}${staleWarn}</b></div>
         <div><label>${esc(m.metric.label)}</label><b>${m.metric.fmt(srow[m.metric.key]) ?? "—"}</b></div>
-        <div><label>Pens</label><b>${pens}</b></div>
+        <div><label>npG − npxG</label><b>${m.overP!=null
+          ? `<span style="color:${m.overP>0?"var(--green)":m.overP<0?"var(--red)":"inherit"}">${
+              m.overP>0?"+":""}${m.overP.toFixed(1)}</span>` : "—"}</b></div>
         <div><label>Peers</label><b>${m.pool.length} ${esc(srow.primary_position ?? "")}</b></div>
       </div>
       <div class="facts nums">
@@ -448,6 +461,18 @@ function render(rows, moves, srow, peers, seasons, curve = []){
         <p class="cap">Typical value = same-position average at that age. Lines are shape-fitted
            to their own scale (different units) — real values in the tooltip.</p>
       </div>
+      ${rows.some(r=>r.np_xg!=null) ? `
+      <div class="box">
+        <h2><span class="swatch" style="background:var(--green)"></span>npGoals
+          <span class="swatch" style="background:var(--chalk-y)"></span>npxG
+          <span class="plain">· finishing vs chance quality</span></h2>
+        <div class="chartbox">${xgChart(rows)}</div>
+        <p class="cap">Bars = non-penalty goals, line = the xG those chances were worth.
+           Above the line is overperformance — real finishing skill takes several
+           seasons to separate from luck, so read the run, not one bar.
+           ${rows.some(r=>r.np_xg==null && +r.season >= 2014)
+             ? "Seasons without a bar had no Understat match." : ""}</p>
+      </div>` : ""}
     </div>
   </div>
 
@@ -610,6 +635,36 @@ function valueChart(rows, moves = []){
 // (the age-curve line has no column — it looks up the per-age average)
 const asGetter = key => typeof key === "function" ? key : (r => r[key]);
 
+// npGoals bars vs npxG line — shared count axis, so the gap IS the finishing
+function xgChart(rows){
+  const H=170, PT=14, PB=26;
+  const g  = rows.map(r=>r.np_xg==null ? null : (r.non_penalty_goals ?? 0));
+  const xg = rows.map(r=>r.np_xg);
+  const max = Math.max(...[...g, ...xg].filter(v=>v!=null), 1);
+  const y = v => H-PB-(H-PT-PB)*(v/max);
+  const bw = Math.min(24,(W-PAD_L-PAD_R)/rows.length-2);
+  const bars = rows.map((r,i)=> g[i]==null ? "" : `
+    <rect x="${(bandX(rows,i)-bw/2).toFixed(1)}" y="${y(g[i]).toFixed(1)}"
+      width="${bw.toFixed(1)}" height="${Math.max(H-PB-y(g[i]),1).toFixed(1)}"
+      rx="3" fill="var(--green)" opacity=".85"/>`).join("");
+  const pts = rows.map((r,i)=>xg[i]==null?null:[bandX(rows,i), y(xg[i])]);
+  const seg=[]; let run=[];
+  for(const p of pts){ if(p) run.push(p); else {if(run.length>1)seg.push(run); run=[];} }
+  if(run.length>1) seg.push(run);
+  const line = seg.map(s=>`<path fill="none" stroke="var(--chalk-y)" stroke-width="2"
+    d="M${s.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")}"/>`).join("");
+  const dots = pts.map(p=>p?`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}"
+    r="3" fill="var(--chalk-y)"/>`:"").join("");
+  return `<svg viewBox="0 0 ${W} ${H}" id="xchart" aria-label="Non-penalty goals versus expected goals by season">
+    <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
+    <text x="${PAD_L-6}" y="${PT+8}" text-anchor="end" font-size="11" fill="var(--axis)">${Math.round(max)}</text>
+    ${bars}${line}${dots}
+    ${xAxis(rows,H,PB)}
+    <line id="xcross" y1="${PT}" y2="${H-PB}" stroke="var(--axis)" stroke-dasharray="3 3"
+        visibility="hidden"/>
+  </svg>`;
+}
+
 // position-aware line set shared by the trend chart, its legend and tooltip
 const trendLines = (m, typical = {}) => [
   ["minutes", "var(--blue)", "Minutes", v=>v ?? "—"],
@@ -681,6 +736,24 @@ function wireTooltips(rows, m, typical = {}){
       ${eur(r.market_value_in_eur)}${r.value_is_stale?" ⚠":""}`);
   });
   v.addEventListener("mouseleave", () => { hide(); cross.setAttribute("visibility","hidden"); });
+
+  const xc = document.getElementById("xchart");
+  if(xc){
+    const xcross = document.getElementById("xcross");
+    xc.addEventListener("mousemove", e => {
+      const i = idxFromEvent(xc,e), r = rows[i];
+      xcross.setAttribute("x1",bandX(rows,i)); xcross.setAttribute("x2",bandX(rows,i));
+      xcross.setAttribute("visibility","visible");
+      const d = r.np_xg!=null ? (r.non_penalty_goals ?? 0) - r.np_xg : null;
+      show(e, `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
+        ${r.np_xg!=null
+          ? `${r.non_penalty_goals ?? 0} npG vs ${r.np_xg.toFixed(1)} npxG<br>
+             ${d>0?"+":""}${d.toFixed(1)} ${d>0?"over":"under"}performance`
+          : "no xG data this season"}`);
+    });
+    xc.addEventListener("mouseleave", () => {
+      hide(); xcross.setAttribute("visibility","hidden"); });
+  }
 
   const t = document.getElementById("tchart"), tc = document.getElementById("tcross");
   const tl = trendLines(m, typical);

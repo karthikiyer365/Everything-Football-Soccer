@@ -1,7 +1,9 @@
 """Understat pipelines: xG columns onto player_season + team-match xG table."""
+from difflib import SequenceMatcher
+
 import pandas as pd
 
-from soccerhub.pipelines.xref import _score, normalize
+from soccerhub.pipelines.xref import normalize
 from soccerhub.readers.understat import fetch_understat
 
 UNDERSTAT_SINCE = 2014   # no data before 2014-15
@@ -9,6 +11,24 @@ FUZZY_FLOOR = 0.90       # stricter than xref's 0.85: no birth-year guard here
 # minutes should roughly agree between sources for the same player-stint;
 # a bigger gap means we're about to attach the wrong player
 MINUTES_GUARD = 450
+SUBSET_SCORE = 0.95
+
+
+def _score(a: str, b: str) -> float:
+    """Name similarity for understat <-> hub, within one league-season.
+
+    Deliberately NOT xref's scorer. There, candidates came from a 32k-player
+    global registry, so a single-token subset ('Yuri' inside anything) was
+    false-positive fuel and the rule demanded >= 2 tokens. Here the pool is
+    the ~600 players of one league-season and every candidate has already
+    passed the minutes guard, so single-token subsets are the common honest
+    case: Understat writes the Spanish short name ('Remiro', 'Raillo') where
+    FBref writes the legal name ('Alex Remiro', 'Antonio Raillo').
+    """
+    ta, tb = set(a.split()), set(b.split())
+    if ta <= tb or tb <= ta:
+        return SUBSET_SCORE
+    return SequenceMatcher(None, a, b).ratio()
 
 XG_COLS = {
     "xg": "xg", "np_xg": "np_xg", "xa": "xa",
@@ -57,20 +77,27 @@ def match_players(us: pd.DataFrame, hub: pd.DataFrame) -> pd.DataFrame:
                 pairs.append((h, u))
                 remaining.remove(u)
 
-    # rung 3: fuzzy leftovers (accent/spelling drift), minutes-guarded
+    # rung 3: leftovers — short-name/accent drift, minutes-guarded.
+    # Ties are rejected, not guessed: two hub players scoring alike (two
+    # "Gabriel"s in one league) means we cannot know which, so neither gets
+    # the xG rather than one getting someone else's.
     used_h = {h for h, _ in pairs}
     used_u = {u for _, u in pairs}
     left_h = [i for i in hub.index if i not in used_h]
     left_u = [i for i in us.index if i not in used_u]
-    for u in left_u:
-        best, best_ratio = None, 0.0
+    # longest-minutes first: the clearest cases claim their partner before
+    # the marginal ones can muddy the pool
+    for u in sorted(left_u, key=lambda i: -us_min[i]):
+        best, best_ratio, runner_up = None, 0.0, 0.0
         for h in left_h:
             if abs(hub_min[h] - us_min[u]) > MINUTES_GUARD:
                 continue
             ratio = _score(us_norm[u], hub_norm[h])
             if ratio > best_ratio:
-                best, best_ratio = h, ratio
-        if best is not None and best_ratio >= FUZZY_FLOOR:
+                best, best_ratio, runner_up = h, ratio, best_ratio
+            elif ratio > runner_up:
+                runner_up = ratio
+        if best is not None and best_ratio >= FUZZY_FLOOR and runner_up < best_ratio:
             pairs.append((best, u))
             left_h.remove(best)
 
