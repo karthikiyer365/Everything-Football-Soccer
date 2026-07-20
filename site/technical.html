@@ -89,6 +89,24 @@
   .pzlegend{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;
        margin-top:8px;font-size:12px}
   .pzlegend .i{display:flex;gap:6px;align-items:center;color:var(--muted)}
+  .cmpbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+  .cmpchip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);
+       border-radius:999px;padding:4px 8px 4px 11px;font-size:.82rem}
+  .cmpchip .swatch{width:9px;height:9px;border-radius:50%}
+  .cmpchip button{border:0;background:rgba(242,245,239,.12);color:var(--line);border-radius:50%;
+       width:17px;height:17px;line-height:1;font-size:11px;cursor:pointer}
+  .cmpsearch{position:relative}
+  #cmpq{width:190px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);
+       background:rgba(242,245,239,.04);color:var(--line);font:inherit;font-size:.82rem}
+  #cmpq:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+  #cmpresults{position:absolute;top:112%;left:0;width:240px;background:var(--card);z-index:7;
+       border:1px solid var(--border);border-radius:6px;overflow:hidden auto;display:none;max-height:260px}
+  #cmpresults button{display:flex;justify-content:space-between;gap:10px;width:100%;padding:7px 12px;
+       border:0;background:none;color:var(--line);font:inherit;font-size:.85rem;text-align:left;cursor:pointer}
+  #cmpresults button:hover{background:rgba(255,180,58,.12)}
+  #cmpresults .sub{color:var(--tag);font-size:.78rem}
+  .axlist.cmp .r{grid-template-columns:1fr repeat(var(--np,2),42px)}
+  .axlist.cmp .r.head b{font-size:10px}
   .axgroup{margin-bottom:14px}
   .axgroup h3{margin:0 0 4px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
        display:flex;gap:7px;align-items:center}
@@ -312,15 +330,39 @@ async function load(){
   render();
 }
 
+// per-player series colours for compare mode (main is [0])
+const SERIES = ["var(--amber)","var(--blue)","var(--chalk-y)","var(--red)"];
+const MAX_VS = 3;   // main + 3 comparisons
+
+const mainTm = () => new URLSearchParams(location.search).get("tm");
+const vsList = () => (new URLSearchParams(location.search).get("vs")||"")
+  .split(",").filter(Boolean).slice(0, MAX_VS);
 const sel = () => {
   const s = new URLSearchParams(location.search).get("s");
   return career.some(r=>r.season===s) ? s : "career";
 };
-function setSeason(s){
+function pushUrl({s, vs}){
   const u = new URL(location);
-  u.search = `?tm=${new URLSearchParams(location.search).get("tm")}` +
-             (s==="career" ? "" : `&s=${s}`);
+  const p = new URLSearchParams();
+  p.set("tm", mainTm());
+  const season = s!==undefined ? s : sel();
+  if(season && season!=="career") p.set("s", season);
+  const v = vs!==undefined ? vs : vsList();
+  if(v.length) p.set("vs", v.join(","));
+  u.search = "?"+p.toString();
   history.pushState({}, "", u); render();
+}
+const setSeason = s => pushUrl({s});
+const addVs = tm => { const v=vsList(); if(!v.includes(tm)&&tm!==mainTm()&&v.length<MAX_VS) pushUrl({vs:[...v,tm]}); };
+const removeVs = tm => pushUrl({vs: vsList().filter(x=>x!==tm)});
+
+// career rows per player, cached — comparison players need the same rates()
+const careerCache = new Map();
+async function playerCareer(tm){
+  if(!careerCache.has(tm))
+    careerCache.set(tm, hub("player_season",
+      {select:"*", tm_id:`eq.${tm}`, season:`gte.${XG_SINCE}`, order:"season"}));
+  return careerCache.get(tm);
 }
 
 async function peerPool(league, pos, season){
@@ -390,14 +432,17 @@ async function render(){
 
   <div class="box" style="margin-top:16px">
     <h2>Technical profile <span class="plain">· percentile vs positional peers</span></h2>
+    <div class="cmpbar">
+      <span id="cmpchips"></span>
+      <span class="cmpsearch" ${vsList().length>=MAX_VS?'hidden':''}>
+        <input id="cmpq" type="search" placeholder="+ compare player…" autocomplete="off">
+        <div id="cmpresults"></div>
+      </span>
+    </div>
     <div class="profile">
       <div class="pizzawrap">
         <div class="chartbox" id="pizza"><p class="cap">Ranking…</p></div>
-        <div class="pzlegend">
-          <span class="i"><span class="swatch" style="background:var(--amber)"></span>Attack</span>
-          <span class="i"><span class="swatch" style="background:var(--blue)"></span>Playmaking</span>
-          <span class="i"><span class="swatch" style="background:var(--green)"></span>Defence</span>
-        </div>
+        <div class="pzlegend" id="pzlegend"></div>
       </div>
       <div id="axlists"></div>
     </div>
@@ -407,10 +452,45 @@ async function render(){
   document.getElementById("chips").addEventListener("click", e=>{
     const v = e.target.dataset?.s; if(v) setSeason(v);
   });
+  wireCompare();
 
   drawPitch(shotRows);
   drawShotStats(shotRows, mine);
-  await drawRadars(mine, s);
+  await drawRadars(s);
+}
+
+/* ---------- compare-player picker ---------- */
+function wireCompare(){
+  const q = document.getElementById("cmpq");
+  const res = document.getElementById("cmpresults");
+  if(q){
+    let d;
+    q.addEventListener("input", ()=>{ clearTimeout(d);
+      const v = q.value.trim();
+      if(v.length<3){ res.innerHTML=""; res.style.display="none"; return; }
+      d = setTimeout(async ()=>{
+        const rows = await hub("player_season", {select:"player_name,tm_id,team,season",
+          player_name:`ilike.*${v}*`, season:`gte.${XG_SINCE}`, order:"season.desc", limit:"40"});
+        const seen=new Set(), pk=[];
+        for(const r of rows){ if(r.tm_id==null||seen.has(r.tm_id)||String(r.tm_id)===mainTm()
+          ||vsList().includes(String(r.tm_id))) continue;
+          seen.add(r.tm_id); pk.push(r); if(pk.length>=6) break; }
+        res.innerHTML = pk.map(p=>`<button data-add="${p.tm_id}">${esc(p.player_name)}
+          <span class="sub">${esc(p.team)}</span></button>`).join("")
+          || `<button disabled>no match</button>`;
+        res.style.display="block";
+      }, 300);
+    });
+  }
+}
+document.addEventListener("click", cmpDocClick);  // once — survives re-renders
+function cmpDocClick(e){
+  const add = e.target.closest("#cmpresults [data-add]");
+  if(add){ addVs(add.dataset.add); return; }
+  const rm = e.target.closest("[data-rmvs]");
+  if(rm){ removeVs(rm.dataset.rmvs); return; }
+  const res = document.getElementById("cmpresults");
+  if(res && !e.target.closest(".cmpsearch")){ res.style.display="none"; }
 }
 
 /* ---------- shot map ---------- */
@@ -542,120 +622,173 @@ function drawShotStats(rows, mine){
     </div>`;
 }
 
-/* ---------- pizza (percentile bar-radar) ---------- */
-async function drawRadars(mine, season){
+/* ---------- radar (solo group-coloured, or multi-player overlay) ---------- */
+// build one player's slice list (percentile vs the SHARED pool, so axes mean
+// the same thing for everyone on the chart)
+function slicesFor(rowsForPlayer, pool){
+  const q = rates(rowsForPlayer);
+  if(!q) return null;
+  const out = [];
+  for(const g of GROUPS) for(const a of g.axes){
+    const raw = q[a.k];
+    const p = raw==null ? null : pctOf(pool.map(x=>x[a.k]).filter(v=>v!=null), raw);
+    out.push({...a, group:g.name, color:g.color, raw,
+              pct: p==null ? null : (a.inv ? 100-p : p)});
+  }
+  return out;
+}
+
+async function drawRadars(season){
   const pz = document.getElementById("pizza");
   const ax = document.getElementById("axlists");
-  if(!mine){ pz.innerHTML = `<p class="cap">No minutes in this selection.</p>`;
-    ax.innerHTML = ""; return; }
+  const vs = vsList();
+  const compare = vs.length > 0;
+  // comparisons need a common basis → force career when overlaying
+  const rSeason = compare ? "career" : season;
 
   let pool;
-  try{ pool = await peerPool(srow.league, srow.primary_position, season); }
+  try{ pool = await peerPool(srow.league, srow.primary_position, rSeason); }
   catch(e){ pz.innerHTML = `<p class="cap">Could not load the peer pool
     (${esc(e.message)}).</p>`; return; }
 
-  // one flat list of slices, in group order, each carrying its group's colour
-  const slices = [];
-  for(const g of GROUPS) for(const a of g.axes){
-    const raw = mine[a.k];
-    const p = raw==null ? null : pctOf(pool.map(q=>q[a.k]).filter(v=>v!=null), raw);
-    slices.push({...a, group:g.name, color:g.color, raw,
-                 pct: p==null ? null : (a.inv ? 100-p : p)});
+  // main player
+  const mainRows = rSeason==="career" ? career : career.filter(r=>r.season===rSeason);
+  const players = [{tm:mainTm(), name:srow.player_name, pos:srow.primary_position,
+                    color:SERIES[0], slices:slicesFor(mainRows, pool)}];
+  // comparison players (career), ranked against the SAME pool
+  for(let i=0;i<vs.length;i++){
+    let rows=[]; try{ rows = await playerCareer(vs[i]); }catch{}
+    if(!rows.length) continue;
+    const sr = rows[rows.length-1];
+    players.push({tm:vs[i], name:sr.player_name, pos:sr.primary_position,
+      color:SERIES[i+1], slices:slicesFor(rows, pool)});
   }
-  pz.innerHTML = profileRadar(slices);
+  const valid = players.filter(p=>p.slices);
+  if(!valid.length){ pz.innerHTML = `<p class="cap">No minutes in this selection.</p>`;
+    ax.innerHTML=""; return; }
 
-  ax.innerHTML = GROUPS.map(g=>{
-    const rows = slices.filter(s=>s.group===g.name);
-    return `<div class="axgroup">
-      <h3 style="color:${g.color}"><span class="swatch" style="background:${g.color}"></span>
-        ${esc(g.name)} <span class="plain" style="color:var(--muted)">· ${g.grade}</span></h3>
-      <div class="axlist nums">
-        ${rows.map(a=>`<div class="r"><span>${esc(a.lab)}${a.inv?" ↓":""}</span>
-          <span class="raw">${a.raw==null?"—":a.fmt(a.raw)}</span>
-          <b style="color:${a.pct==null?"var(--muted)":g.color}">${a.pct ?? "—"}</b></div>`).join("")}
-      </div></div>`;
-  }).join("");
+  pz.innerHTML = profileRadar(valid, compare);
 
-  document.getElementById("notes").innerHTML = `
-    The coloured shape is this player, each vertex a metric's percentile against every
-    <b>${esc(srow.primary_position ?? "")}</b> in the
-    ${esc(srow.league.split("-")[1] ?? srow.league)} over the same span
-    (${pool.length} players with ${MIN_90S_PEER}+ full matches). The grey pizza behind it
-    is the peer median — the 50th percentile on every axis — so wherever the colour spills
-    past the grey, this player is above average. Fill and edges are coloured by group:
-    <span style="color:var(--amber)">attack</span>,
-    <span style="color:var(--blue)">playmaking</span>,
-    <span style="color:var(--green)">defence</span>. Rates come from summed totals, so a
-    career view is minutes-weighted. Axes marked ↓ are inverted — fewer fouls or cards
-    pushes the shape outward. Attack and playmaking measure their construct directly;
-    defensive counts are a far proxy — read them as activity, not quality.`;
+  // legend + compare chips
+  document.getElementById("pzlegend").innerHTML = compare
+    ? valid.map(p=>`<span class="i"><span class="swatch" style="background:${p.color}"></span>
+        ${esc(p.name)}</span>`).join("")
+    : `<span class="i"><span class="swatch" style="background:var(--amber)"></span>Attack</span>
+       <span class="i"><span class="swatch" style="background:var(--blue)"></span>Playmaking</span>
+       <span class="i"><span class="swatch" style="background:var(--green)"></span>Defence</span>`;
+  document.getElementById("cmpchips").innerHTML = valid.slice(1).map(p=>
+    `<span class="cmpchip" style="border-color:${p.color}">
+       <span class="swatch" style="background:${p.color}"></span>${esc(p.name)}
+       <button data-rmvs="${p.tm}" aria-label="remove">×</button></span>`).join("");
+
+  // axis list: solo = grouped w/ percentiles; compare = per-player columns
+  ax.innerHTML = compare
+    ? `<div class="axlist cmp nums" style="--np:${valid.length}"><div class="r head"><span></span>
+         ${valid.map(p=>`<b style="color:${p.color}">${esc(p.name.split(" ").pop())}</b>`).join("")}</div>
+       ${GROUPS.flatMap(g=>g.axes).map((a,i)=>`<div class="r"><span>${esc(a.lab)}${a.inv?" ↓":""}</span>
+         ${valid.map(p=>`<b>${p.slices[i].pct ?? "—"}</b>`).join("")}</div>`).join("")}</div>`
+    : GROUPS.map(g=>{
+        const rows = valid[0].slices.filter(s=>s.group===g.name);
+        return `<div class="axgroup">
+          <h3 style="color:${g.color}"><span class="swatch" style="background:${g.color}"></span>
+            ${esc(g.name)} <span class="plain" style="color:var(--muted)">· ${g.grade}</span></h3>
+          <div class="axlist nums">
+            ${rows.map(a=>`<div class="r"><span>${esc(a.lab)}${a.inv?" ↓":""}</span>
+              <span class="raw">${a.raw==null?"—":a.fmt(a.raw)}</span>
+              <b style="color:${a.pct==null?"var(--muted)":g.color}">${a.pct ?? "—"}</b></div>`).join("")}
+          </div></div>`;
+      }).join("");
+
+  document.getElementById("notes").innerHTML = compare
+    ? `Each polygon is a player, every vertex a metric's percentile against the same pool —
+       every <b>${esc(srow.primary_position ?? "")}</b> in the
+       ${esc(srow.league.split("-")[1] ?? srow.league)} (${pool.length} players, career).
+       Comparison players are ranked against ${esc(srow.player_name)}'s positional pool, so
+       a player from another position is measured on these axes too — read cross-position
+       overlays with that in mind. Axes marked ↓ are inverted.`
+    : `The coloured shape is this player, each vertex a metric's percentile against every
+       <b>${esc(srow.primary_position ?? "")}</b> in the
+       ${esc(srow.league.split("-")[1] ?? srow.league)} over the same span
+       (${pool.length} players with ${MIN_90S_PEER}+ full matches). The grey pizza behind is
+       the peer median — 50th percentile on every axis, so wherever the colour spills past
+       it, this player is above average. Fill and edges are coloured by group:
+       <span style="color:var(--amber)">attack</span>,
+       <span style="color:var(--blue)">playmaking</span>,
+       <span style="color:var(--green)">defence</span>. Add a compare player above to overlay
+       a second shape. Rates are minutes-weighted; ↓ axes are inverted; defensive counts are
+       a far proxy — activity, not quality.`;
 }
 
-const HEX = {"var(--amber)":"#ffb43a", "var(--blue)":"#5aa9f0", "var(--green)":"#8fd18a"};
+const HEX = {"var(--amber)":"#ffb43a", "var(--blue)":"#5aa9f0", "var(--green)":"#8fd18a",
+             "var(--chalk-y)":"#e8d47a", "var(--red)":"#e0524a"};
 
-// Profile radar: player as a group-coloured filled polygon over a translucent
-// grey pizza backdrop = the peer median (50th pct on every axis by definition).
-// Where the coloured shape spills past the grey, the player is above average.
-function profileRadar(slices){
-  window._slices = slices;
-  const S=480, cx=S/2, cy=S/2, R0=40, R1=176, N=slices.length;
+// Radar. Solo: one group-coloured polygon over a grey peer-median backdrop.
+// Compare: each player a single-colour line polygon, no median (the overlay is
+// the reference). `players` = [{name,color,slices}], slices share the same axes.
+function profileRadar(players, compare){
+  window._players = players;
+  const S=480, cx=S/2, cy=S/2, R0=40, R1=176, N=players[0].slices.length;
   const step = 2*Math.PI/N, gap = 0.03;
   const ang = i => -Math.PI/2 + (i+0.5)*step;         // vertex sits mid-wedge
   const rad = p => R0 + (R1-R0)*(p ?? 0)/100;
   const at  = (i,p) => [cx + rad(p)*Math.cos(ang(i)), cy + rad(p)*Math.sin(ang(i))];
   const ptAbs = (r,a) => `${(cx+r*Math.cos(a)).toFixed(1)} ${(cy+r*Math.sin(a)).toFixed(1)}`;
+  const hex = c => HEX[c] ?? c;
+  const slices = players[0].slices;   // axis definitions shared across players
 
   let g = "";
-  // guide rings 25/50/75/100
   for(const f of [.25,.5,.75,1])
     g += `<circle cx="${cx}" cy="${cy}" r="${(R0+(R1-R0)*f).toFixed(1)}" fill="none"
       stroke="var(--grid)" stroke-dasharray="${f===1?"none":"2 4"}"/>`;
 
-  // ---- peer-median backdrop: grey pizza wedges to 50% ----
-  slices.forEach((s,i)=>{
-    const a0 = -Math.PI/2 + i*step + gap, a1 = -Math.PI/2 + (i+1)*step - gap, r = rad(50);
-    g += `<path d="M ${ptAbs(R0,a0)} L ${ptAbs(r,a0)} A ${r} ${r} 0 0 1 ${ptAbs(r,a1)}
-      L ${ptAbs(R0,a1)} A ${R0} ${R0} 0 0 0 ${ptAbs(R0,a0)} Z"
-      fill="var(--line)" fill-opacity=".08"/>`;
-  });
-  // the 50% line itself, so "average" is legible
-  g += `<circle cx="${cx}" cy="${cy}" r="${rad(50).toFixed(1)}" fill="none"
-    stroke="var(--line)" stroke-opacity=".22" stroke-dasharray="1 5"/>`;
-
-  // spokes
+  // peer-median backdrop only in solo mode (in compare, the overlay is the reference)
+  if(!compare){
+    slices.forEach((s,i)=>{
+      const a0 = -Math.PI/2 + i*step + gap, a1 = -Math.PI/2 + (i+1)*step - gap, r = rad(50);
+      g += `<path d="M ${ptAbs(R0,a0)} L ${ptAbs(r,a0)} A ${r} ${r} 0 0 1 ${ptAbs(r,a1)}
+        L ${ptAbs(R0,a1)} A ${R0} ${R0} 0 0 0 ${ptAbs(R0,a0)} Z"
+        fill="var(--line)" fill-opacity=".08"/>`;
+    });
+    g += `<circle cx="${cx}" cy="${cy}" r="${rad(50).toFixed(1)}" fill="none"
+      stroke="var(--line)" stroke-opacity=".22" stroke-dasharray="1 5"/>`;
+  }
   slices.forEach((s,i)=>{ const [x,y] = at(i,100);
     g += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"
       stroke="var(--grid)"/>`; });
 
-  // ---- player polygon: group-coloured fans + neutral base ----
-  const poly = slices.map((s,i)=>at(i,s.pct).map(v=>v.toFixed(1)).join(",")).join(" ");
-  g += `<polygon points="${poly}" fill="var(--line)" fill-opacity=".05"/>`;
-  // one translucent fan per group (centre + that group's vertices), coloured
-  const groups = [...new Set(slices.map(s=>s.group))];
-  for(const gr of groups){
-    const idx = slices.map((s,i)=>({s,i})).filter(o=>o.s.group===gr).map(o=>o.i);
-    const col = HEX[slices[idx[0]].color] ?? slices[idx[0]].color;
-    const pts = [`${cx},${cy}`, ...idx.map(i=>at(i,slices[i].pct).map(v=>v.toFixed(1)).join(","))].join(" ");
-    g += `<polygon points="${pts}" fill="${col}" fill-opacity=".20"/>`;
-  }
-  // edges coloured by group (boundary edges muted)
-  slices.forEach((s,i)=>{
-    const j = (i+1)%N, [x1,y1] = at(i,s.pct), [x2,y2] = at(j,slices[j].pct);
-    const same = s.group === slices[j].group;
-    const col = same ? (HEX[s.color]??s.color) : "rgba(242,245,239,.45)";
-    g += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}"
-      y2="${y2.toFixed(1)}" stroke="${col}" stroke-width="2.5" stroke-linecap="round"/>`;
-  });
-  // vertices — coloured dots, hoverable
-  slices.forEach((s,i)=>{
-    if(s.pct==null) return;
-    const [x,y] = at(i,s.pct);
-    g += `<circle data-i="${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"
-      fill="${HEX[s.color]??s.color}" stroke="var(--card)" stroke-width="1.5"
-      style="cursor:default"/>`;
-  });
+  const polyPts = sl => sl.map((s,i)=>at(i,s.pct).map(v=>v.toFixed(1)).join(",")).join(" ");
 
-  // labels
+  if(!compare){
+    // solo: group-coloured fans + group-coloured edges + group dots
+    const sl = slices;
+    g += `<polygon points="${polyPts(sl)}" fill="var(--line)" fill-opacity=".05"/>`;
+    for(const gr of [...new Set(sl.map(s=>s.group))]){
+      const idx = sl.map((s,i)=>({s,i})).filter(o=>o.s.group===gr).map(o=>o.i);
+      const pts = [`${cx},${cy}`, ...idx.map(i=>at(i,sl[i].pct).map(v=>v.toFixed(1)).join(","))].join(" ");
+      g += `<polygon points="${pts}" fill="${hex(sl[idx[0]].color)}" fill-opacity=".20"/>`;
+    }
+    sl.forEach((s,i)=>{
+      const j=(i+1)%N, [x1,y1]=at(i,s.pct), [x2,y2]=at(j,sl[j].pct);
+      const col = s.group===sl[j].group ? hex(s.color) : "rgba(242,245,239,.45)";
+      g += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}"
+        y2="${y2.toFixed(1)}" stroke="${col}" stroke-width="2.5" stroke-linecap="round"/>`;
+    });
+    sl.forEach((s,i)=>{ if(s.pct==null) return; const [x,y]=at(i,s.pct);
+      g += `<circle data-p="0" data-i="${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"
+        fill="${hex(s.color)}" stroke="var(--card)" stroke-width="1.5" style="cursor:default"/>`; });
+  }else{
+    // compare: one single-colour line polygon (light fill) per player
+    players.forEach((pl,pi)=>{
+      const c = hex(pl.color);
+      g += `<polygon points="${polyPts(pl.slices)}" fill="${c}" fill-opacity=".08"
+        stroke="${c}" stroke-width="2.5" stroke-linejoin="round"/>`;
+      pl.slices.forEach((s,i)=>{ if(s.pct==null) return; const [x,y]=at(i,s.pct);
+        g += `<circle data-p="${pi}" data-i="${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5"
+          fill="${c}" stroke="var(--card)" stroke-width="1.5" style="cursor:default"/>`; });
+    });
+  }
+
+  // labels (shared axes)
   slices.forEach((s,i)=>{
     const a = ang(i), deg = a*180/Math.PI, flip = deg>90 || deg<-90;
     const lr = R1+26, lx = cx+lr*Math.cos(a), ly = cy+lr*Math.sin(a);
@@ -666,17 +799,18 @@ function profileRadar(slices){
   });
   g += `<circle cx="${cx}" cy="${cy}" r="${(R0-6).toFixed(1)}" fill="var(--card)"
     stroke="var(--border)"/>`;
-  return `<svg viewBox="0 0 ${S} ${S}" id="pizzasvg" aria-label="Player profile radar vs peer median"
+  return `<svg viewBox="0 0 ${S} ${S}" id="pizzasvg" aria-label="Player profile radar"
      onmousemove="pizzaHover(event)" onmouseleave="hidePizza()">${g}</svg>`;
 }
 // hover survives innerHTML swaps
 window.pizzaHover = e => {
   const d = e.target.closest("circle[data-i]");
   if(!d){ hideTip(); return; }
-  const s = window._slices?.[+d.dataset.i];
-  if(s) showTip(e, `<div class="t">${esc(s.group)}</div>
-    ${esc(s.lab)}${s.inv?" ↓":""}: <b>${s.fmt(s.raw)}</b> · ${s.pct}th pct
-    <span style="color:var(--muted)">(50 = peer median)</span>`);
+  const pl = window._players?.[+d.dataset.p];
+  const s = pl?.slices[+d.dataset.i];
+  if(s) showTip(e, `<div class="t">${esc(pl.name)} · ${esc(s.group)}</div>
+    ${esc(s.lab)}${s.inv?" ↓":""}: <b>${s.raw==null?"—":s.fmt(s.raw)}</b>
+    · ${s.pct ?? "—"}th pct`);
 };
 window.hidePizza = () => hideTip();
 </script>
