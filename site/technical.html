@@ -559,7 +559,7 @@ async function drawRadars(mine, season){
     slices.push({...a, group:g.name, color:g.color, raw,
                  pct: p==null ? null : (a.inv ? 100-p : p)});
   }
-  pz.innerHTML = pizzaSvg(slices);
+  pz.innerHTML = profileRadar(slices);
 
   ax.innerHTML = GROUPS.map(g=>{
     const rows = slices.filter(s=>s.group===g.name);
@@ -574,88 +574,106 @@ async function drawRadars(mine, season){
   }).join("");
 
   document.getElementById("notes").innerHTML = `
-    Each wedge is one metric; its length is this player's percentile against every
+    The coloured shape is this player, each vertex a metric's percentile against every
     <b>${esc(srow.primary_position ?? "")}</b> in the
     ${esc(srow.league.split("-")[1] ?? srow.league)} over the same span
-    (${pool.length} players with ${MIN_90S_PEER}+ full matches). Rates come from summed
-    totals, so a career view is minutes-weighted rather than averaging seasons equally.
-    Wedges marked ↓ are inverted — fewer fouls or cards means a longer wedge.
-    Attack and playmaking measure their construct directly; defensive counts are a
-    far proxy — read them as activity, not quality.`;
+    (${pool.length} players with ${MIN_90S_PEER}+ full matches). The grey pizza behind it
+    is the peer median — the 50th percentile on every axis — so wherever the colour spills
+    past the grey, this player is above average. Fill and edges are coloured by group:
+    <span style="color:var(--amber)">attack</span>,
+    <span style="color:var(--blue)">playmaking</span>,
+    <span style="color:var(--green)">defence</span>. Rates come from summed totals, so a
+    career view is minutes-weighted. Axes marked ↓ are inverted — fewer fouls or cards
+    pushes the shape outward. Attack and playmaking measure their construct directly;
+    defensive counts are a far proxy — read them as activity, not quality.`;
 }
 
-// pizza: one wedge per metric, length = percentile, colour = group.
-// Every wedge is on the same 0-100 scale, so lengths are directly comparable.
 const HEX = {"var(--amber)":"#ffb43a", "var(--blue)":"#5aa9f0", "var(--green)":"#8fd18a"};
-function pizzaSvg(slices){
-  window._slices = slices;   // hover handler reads back by index
-  const S=480, cx=S/2, cy=S/2, R0=46, R1=176, N=slices.length;
-  const step = 2*Math.PI/N, gap = 0.028;
-  const pt = (r,a) => `${(cx+r*Math.cos(a)).toFixed(1)} ${(cy+r*Math.sin(a)).toFixed(1)}`;
-  // annular sector R0->r, angle a0->a1 (clockwise outer, counter-clockwise inner)
-  const wedge = (a0, a1, r, fill, op, extra="") =>
-    `<path d="M ${pt(R0,a0)} L ${pt(r,a0)} A ${r} ${r} 0 0 1 ${pt(r,a1)}
-       L ${pt(R0,a1)} A ${R0} ${R0} 0 0 0 ${pt(R0,a0)} Z"
-       fill="${fill}" fill-opacity="${op}" ${extra}/>`;
 
-  // one radial gradient per group colour: darker at the hub, full colour at the rim
-  const cols = [...new Set(slices.map(s=>s.color))];
-  const defs = cols.map((c,i)=>{
-    const hex = HEX[c] ?? c;
-    return `<radialGradient id="pz${i}" gradientUnits="userSpaceOnUse"
-        cx="${cx}" cy="${cy}" r="${R1}">
-      <stop offset="${R0/R1}" stop-color="${hex}" stop-opacity=".35"/>
-      <stop offset="1" stop-color="${hex}" stop-opacity="1"/>
-    </radialGradient>`;
-  }).join("");
-  const gradOf = c => `url(#pz${cols.indexOf(c)})`;
+// Profile radar: player as a group-coloured filled polygon over a translucent
+// grey pizza backdrop = the peer median (50th pct on every axis by definition).
+// Where the coloured shape spills past the grey, the player is above average.
+function profileRadar(slices){
+  window._slices = slices;
+  const S=480, cx=S/2, cy=S/2, R0=40, R1=176, N=slices.length;
+  const step = 2*Math.PI/N, gap = 0.03;
+  const ang = i => -Math.PI/2 + (i+0.5)*step;         // vertex sits mid-wedge
+  const rad = p => R0 + (R1-R0)*(p ?? 0)/100;
+  const at  = (i,p) => [cx + rad(p)*Math.cos(ang(i)), cy + rad(p)*Math.sin(ang(i))];
+  const ptAbs = (r,a) => `${(cx+r*Math.cos(a)).toFixed(1)} ${(cy+r*Math.sin(a)).toFixed(1)}`;
 
   let g = "";
-  // background rings + faint percentile guides
-  for(const f of [.25,.5,.75,1]){
-    const r = R0 + (R1-R0)*f;
-    g += `<circle cx="${cx}" cy="${cy}" r="${r.toFixed(1)}" fill="none"
+  // guide rings 25/50/75/100
+  for(const f of [.25,.5,.75,1])
+    g += `<circle cx="${cx}" cy="${cy}" r="${(R0+(R1-R0)*f).toFixed(1)}" fill="none"
       stroke="var(--grid)" stroke-dasharray="${f===1?"none":"2 4"}"/>`;
-  }
+
+  // ---- peer-median backdrop: grey pizza wedges to 50% ----
   slices.forEach((s,i)=>{
-    const a0 = -Math.PI/2 + i*step + gap, a1 = -Math.PI/2 + (i+1)*step - gap;
-    const mid = (a0+a1)/2;
-    // faint full-length track, then the gradient-filled percentile wedge
-    g += wedge(a0, a1, R1, s.color, .10);
-    if(s.pct!=null){
-      const r = R0 + (R1-R0)*s.pct/100;
-      g += `<g data-i="${i}" style="cursor:default">
-        ${wedge(a0, a1, r, gradOf(s.color), 1,
-                `stroke="var(--card)" stroke-width="1.5" stroke-linejoin="round"`)}</g>`;
-      // percentile number in a pill just past the wedge tip
-      const nr = r + 13, [nx,ny] = [cx+nr*Math.cos(mid), cy+nr*Math.sin(mid)];
-      g += `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="10.5"
-        fill="var(--card)" stroke="${HEX[s.color]??s.color}" stroke-opacity=".6"/>
-        <text x="${nx.toFixed(1)}" y="${(ny+3.5).toFixed(1)}" text-anchor="middle"
-        font-size="10" fill="var(--line)" font-weight="700">${s.pct}</text>`;
-    }
-    // radial label, flipped on the left half so it never reads upside-down
-    const deg = mid*180/Math.PI, flip = mid > Math.PI/2 || mid < -Math.PI/2;
-    const lr = R1 + 30, [lx,ly] = [cx+lr*Math.cos(mid), cy+lr*Math.sin(mid)];
-    const rot = flip ? deg+180 : deg;
+    const a0 = -Math.PI/2 + i*step + gap, a1 = -Math.PI/2 + (i+1)*step - gap, r = rad(50);
+    g += `<path d="M ${ptAbs(R0,a0)} L ${ptAbs(r,a0)} A ${r} ${r} 0 0 1 ${ptAbs(r,a1)}
+      L ${ptAbs(R0,a1)} A ${R0} ${R0} 0 0 0 ${ptAbs(R0,a0)} Z"
+      fill="var(--line)" fill-opacity=".08"/>`;
+  });
+  // the 50% line itself, so "average" is legible
+  g += `<circle cx="${cx}" cy="${cy}" r="${rad(50).toFixed(1)}" fill="none"
+    stroke="var(--line)" stroke-opacity=".22" stroke-dasharray="1 5"/>`;
+
+  // spokes
+  slices.forEach((s,i)=>{ const [x,y] = at(i,100);
+    g += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"
+      stroke="var(--grid)"/>`; });
+
+  // ---- player polygon: group-coloured fans + neutral base ----
+  const poly = slices.map((s,i)=>at(i,s.pct).map(v=>v.toFixed(1)).join(",")).join(" ");
+  g += `<polygon points="${poly}" fill="var(--line)" fill-opacity=".05"/>`;
+  // one translucent fan per group (centre + that group's vertices), coloured
+  const groups = [...new Set(slices.map(s=>s.group))];
+  for(const gr of groups){
+    const idx = slices.map((s,i)=>({s,i})).filter(o=>o.s.group===gr).map(o=>o.i);
+    const col = HEX[slices[idx[0]].color] ?? slices[idx[0]].color;
+    const pts = [`${cx},${cy}`, ...idx.map(i=>at(i,slices[i].pct).map(v=>v.toFixed(1)).join(","))].join(" ");
+    g += `<polygon points="${pts}" fill="${col}" fill-opacity=".20"/>`;
+  }
+  // edges coloured by group (boundary edges muted)
+  slices.forEach((s,i)=>{
+    const j = (i+1)%N, [x1,y1] = at(i,s.pct), [x2,y2] = at(j,slices[j].pct);
+    const same = s.group === slices[j].group;
+    const col = same ? (HEX[s.color]??s.color) : "rgba(242,245,239,.45)";
+    g += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}"
+      y2="${y2.toFixed(1)}" stroke="${col}" stroke-width="2.5" stroke-linecap="round"/>`;
+  });
+  // vertices — coloured dots, hoverable
+  slices.forEach((s,i)=>{
+    if(s.pct==null) return;
+    const [x,y] = at(i,s.pct);
+    g += `<circle data-i="${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"
+      fill="${HEX[s.color]??s.color}" stroke="var(--card)" stroke-width="1.5"
+      style="cursor:default"/>`;
+  });
+
+  // labels
+  slices.forEach((s,i)=>{
+    const a = ang(i), deg = a*180/Math.PI, flip = deg>90 || deg<-90;
+    const lr = R1+26, lx = cx+lr*Math.cos(a), ly = cy+lr*Math.sin(a);
     g += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}"
       text-anchor="${flip?"end":"start"}" dominant-baseline="middle" font-size="10.5"
-      transform="rotate(${rot.toFixed(1)} ${lx.toFixed(1)} ${ly.toFixed(1)})"
+      transform="rotate(${(flip?deg+180:deg).toFixed(1)} ${lx.toFixed(1)} ${ly.toFixed(1)})"
       fill="var(--line)" fill-opacity=".85">${esc(s.lab.replace(" /90",""))}${s.inv?" ↓":""}</text>`;
   });
-  // centre hub
-  g += `<circle cx="${cx}" cy="${cy}" r="${R0-4}" fill="var(--card)"
+  g += `<circle cx="${cx}" cy="${cy}" r="${(R0-6).toFixed(1)}" fill="var(--card)"
     stroke="var(--border)"/>`;
-  return `<svg viewBox="0 0 ${S} ${S}" id="pizzasvg" aria-label="Percentile profile by metric"
-     onmousemove="pizzaHover(event)" onmouseleave="hidePizza()"><defs>${defs}</defs>${g}</svg>`;
+  return `<svg viewBox="0 0 ${S} ${S}" id="pizzasvg" aria-label="Player profile radar vs peer median"
+     onmousemove="pizzaHover(event)" onmouseleave="hidePizza()">${g}</svg>`;
 }
-// hover handlers referenced inline so they survive innerHTML swaps
+// hover survives innerHTML swaps
 window.pizzaHover = e => {
-  const grp = e.target.closest("g[data-i]");
-  if(!grp){ hideTip(); return; }
-  const s = window._slices?.[+grp.dataset.i];
+  const d = e.target.closest("circle[data-i]");
+  if(!d){ hideTip(); return; }
+  const s = window._slices?.[+d.dataset.i];
   if(s) showTip(e, `<div class="t">${esc(s.group)}</div>
-    ${esc(s.lab)}${s.inv?" ↓":""}: <b>${s.fmt(s.raw)}</b> · ${s.pct}th pct`);
+    ${esc(s.lab)}${s.inv?" ↓":""}: <b>${s.fmt(s.raw)}</b> · ${s.pct}th pct
+    <span style="color:var(--muted)">(50 = peer median)</span>`);
 };
 window.hidePizza = () => hideTip();
 </script>
