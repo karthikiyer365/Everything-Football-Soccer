@@ -417,7 +417,10 @@ async function render(){
 // Understat coords are normalised: location_x 1.0 = opponent goal line,
 // location_y 0.5 = centre. Drawn as a vertical attacking third, goal at top.
 const PITCH = {W:520, H:440, X0:0.55};   // show from 55% of pitch length up
-const px = ly => 30 + (PITCH.W-60) * ly;
+// Understat y<0.5 is the attacking team's RIGHT (a right-winger's shots sit
+// there); flip so the map reads from the attacker's view — their right on the
+// viewer's right. Everything else drawn is symmetric about y=0.5.
+const px = ly => 30 + (PITCH.W-60) * (1 - ly);
 // ~0.4% of shots come from deeper than the drawn area (halfway-line efforts);
 // pin them to the bottom edge so they stay countable instead of rendering
 // off-canvas, and mark them so the position isn't read as literal
