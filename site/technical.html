@@ -82,9 +82,10 @@
   .split .fill{height:100%;border-radius:4px;background:var(--blue)}
   .split .r b{text-align:right;font-weight:600}
 
-  .profile{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start;margin-top:16px}
+  .profile{display:grid;grid-template-columns:1fr 260px;gap:22px;align-items:start;margin-top:16px}
   @media(max-width:900px){.profile{grid-template-columns:1fr}}
   .pizzawrap{text-align:center}
+  .pizzawrap .chartbox{max-width:560px;margin:0 auto}
   .pzlegend{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;
        margin-top:8px;font-size:12px}
   .pzlegend .i{display:flex;gap:6px;align-items:center;color:var(--muted)}
@@ -585,46 +586,68 @@ async function drawRadars(mine, season){
 
 // pizza: one wedge per metric, length = percentile, colour = group.
 // Every wedge is on the same 0-100 scale, so lengths are directly comparable.
+const HEX = {"var(--amber)":"#ffb43a", "var(--blue)":"#5aa9f0", "var(--green)":"#8fd18a"};
 function pizzaSvg(slices){
   window._slices = slices;   // hover handler reads back by index
-  const S=420, cx=S/2, cy=S/2, R0=34, R1=150, N=slices.length;
-  const step = 2*Math.PI/N, gap = 0.03;
+  const S=480, cx=S/2, cy=S/2, R0=46, R1=176, N=slices.length;
+  const step = 2*Math.PI/N, gap = 0.028;
   const pt = (r,a) => `${(cx+r*Math.cos(a)).toFixed(1)} ${(cy+r*Math.sin(a)).toFixed(1)}`;
   // annular sector R0->r, angle a0->a1 (clockwise outer, counter-clockwise inner)
-  const wedge = (a0, a1, r, fill, op) =>
+  const wedge = (a0, a1, r, fill, op, extra="") =>
     `<path d="M ${pt(R0,a0)} L ${pt(r,a0)} A ${r} ${r} 0 0 1 ${pt(r,a1)}
        L ${pt(R0,a1)} A ${R0} ${R0} 0 0 0 ${pt(R0,a0)} Z"
-       fill="${fill}" fill-opacity="${op}"/>`;
+       fill="${fill}" fill-opacity="${op}" ${extra}/>`;
+
+  // one radial gradient per group colour: darker at the hub, full colour at the rim
+  const cols = [...new Set(slices.map(s=>s.color))];
+  const defs = cols.map((c,i)=>{
+    const hex = HEX[c] ?? c;
+    return `<radialGradient id="pz${i}" gradientUnits="userSpaceOnUse"
+        cx="${cx}" cy="${cy}" r="${R1}">
+      <stop offset="${R0/R1}" stop-color="${hex}" stop-opacity=".35"/>
+      <stop offset="1" stop-color="${hex}" stop-opacity="1"/>
+    </radialGradient>`;
+  }).join("");
+  const gradOf = c => `url(#pz${cols.indexOf(c)})`;
+
   let g = "";
-  // background rings at 25/50/75/100
+  // background rings + faint percentile guides
   for(const f of [.25,.5,.75,1]){
     const r = R0 + (R1-R0)*f;
-    g += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--grid)"/>`;
+    g += `<circle cx="${cx}" cy="${cy}" r="${r.toFixed(1)}" fill="none"
+      stroke="var(--grid)" stroke-dasharray="${f===1?"none":"2 4"}"/>`;
   }
   slices.forEach((s,i)=>{
     const a0 = -Math.PI/2 + i*step + gap, a1 = -Math.PI/2 + (i+1)*step - gap;
     const mid = (a0+a1)/2;
-    // faint full-length track, then the filled percentile wedge over it
-    g += wedge(a0, a1, R1, s.color, .12);
+    // faint full-length track, then the gradient-filled percentile wedge
+    g += wedge(a0, a1, R1, s.color, .10);
     if(s.pct!=null){
       const r = R0 + (R1-R0)*s.pct/100;
-      g += `<g data-i="${i}" style="cursor:default">${wedge(a0,a1,r,s.color,.85)}</g>`;
-      // percentile number just past the wedge tip
-      const [nx,ny] = [cx+(r+11)*Math.cos(mid), cy+(r+11)*Math.sin(mid)];
-      g += `<text x="${nx.toFixed(1)}" y="${(ny+3).toFixed(1)}" text-anchor="middle"
+      g += `<g data-i="${i}" style="cursor:default">
+        ${wedge(a0, a1, r, gradOf(s.color), 1,
+                `stroke="var(--card)" stroke-width="1.5" stroke-linejoin="round"`)}</g>`;
+      // percentile number in a pill just past the wedge tip
+      const nr = r + 13, [nx,ny] = [cx+nr*Math.cos(mid), cy+nr*Math.sin(mid)];
+      g += `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="10.5"
+        fill="var(--card)" stroke="${HEX[s.color]??s.color}" stroke-opacity=".6"/>
+        <text x="${nx.toFixed(1)}" y="${(ny+3.5).toFixed(1)}" text-anchor="middle"
         font-size="10" fill="var(--line)" font-weight="700">${s.pct}</text>`;
     }
     // radial label, flipped on the left half so it never reads upside-down
     const deg = mid*180/Math.PI, flip = mid > Math.PI/2 || mid < -Math.PI/2;
-    const lr = R1 + 16, [lx,ly] = [cx+lr*Math.cos(mid), cy+lr*Math.sin(mid)];
+    const lr = R1 + 30, [lx,ly] = [cx+lr*Math.cos(mid), cy+lr*Math.sin(mid)];
     const rot = flip ? deg+180 : deg;
     g += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}"
-      text-anchor="${flip?"end":"start"}" dominant-baseline="middle" font-size="9.5"
+      text-anchor="${flip?"end":"start"}" dominant-baseline="middle" font-size="10.5"
       transform="rotate(${rot.toFixed(1)} ${lx.toFixed(1)} ${ly.toFixed(1)})"
-      fill="var(--muted)">${esc(s.lab.replace(" /90",""))}${s.inv?" ↓":""}</text>`;
+      fill="var(--line)" fill-opacity=".85">${esc(s.lab.replace(" /90",""))}${s.inv?" ↓":""}</text>`;
   });
+  // centre hub
+  g += `<circle cx="${cx}" cy="${cy}" r="${R0-4}" fill="var(--card)"
+    stroke="var(--border)"/>`;
   return `<svg viewBox="0 0 ${S} ${S}" id="pizzasvg" aria-label="Percentile profile by metric"
-     onmousemove="pizzaHover(event)" onmouseleave="hidePizza()">${g}</svg>`;
+     onmousemove="pizzaHover(event)" onmouseleave="hidePizza()"><defs>${defs}</defs>${g}</svg>`;
 }
 // hover handlers referenced inline so they survive innerHTML swaps
 window.pizzaHover = e => {
