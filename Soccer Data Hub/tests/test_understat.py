@@ -140,3 +140,39 @@ def test_fetch_understat_rejects_unknown_dataset():
     from soccerhub.readers.understat import fetch_understat
     with pytest.raises(ValueError):
         fetch_understat("ENG-Premier League", "2023", "keeper")
+
+
+def test_match_players_single_token_short_names():
+    """Spanish short names: Understat's 'Remiro' is FBref's 'Álex Remiro'.
+
+    xref's scorer rejects single-token subsets (global-registry safety); in a
+    one-league pool behind a minutes guard they are the honest common case.
+    """
+    from soccerhub.pipelines.understat import match_players
+
+    us = _us([
+        ["Remiro", "Real Sociedad", 3275, 0, 0, 0.1, 2, 2, 1, 2, 2555],
+        ["Raíllo", "Mallorca", 2200, 2.0, 2.0, 0.5, 5, 3, 12, 6, 2584],
+        ["Djené Dakonam", "Getafe", 2580, 0.5, 0.5, 0.2, 3, 2, 6, 3, 6151],
+    ])
+    hub = _hub([
+        ["ESP-La Liga", "2023", "Real Sociedad", "Álex Remiro", 3275],
+        ["ESP-La Liga", "2023", "Mallorca", "Antonio Raillo", 2200],
+        ["ESP-La Liga", "2023", "Getafe", "Djené", 2580],  # subset reversed
+    ])
+    out = match_players(us, hub).set_index("player_name")
+    assert out.loc["Álex Remiro", "understat_id"] == 2555
+    assert out.loc["Antonio Raillo", "understat_id"] == 2584   # + accent drift
+    assert out.loc["Djené", "understat_id"] == 6151
+
+
+def test_match_players_rejects_ambiguous_short_name():
+    """Two players who both fit the short name = no match, not a coin flip."""
+    from soccerhub.pipelines.understat import match_players
+
+    us = _us([["Gabriel", "Atletico Madrid", 1800, 1, 1, 1, 4, 2, 9, 4, 777]])
+    hub = _hub([
+        ["ESP-La Liga", "2023", "Atletico Madrid", "Gabriel Paulista", 1800],
+        ["ESP-La Liga", "2023", "Atletico Madrid", "Gabriel Martinelli", 1750],
+    ])
+    assert len(match_players(us, hub)) == 0
