@@ -142,6 +142,14 @@ def test_ask_runs_tool_loop(monkeypatch):
     assert len(gen.calls[1]["contents"]) > 1  # fed the tool response back
 
 
+def test_root_cause_unwraps_exception_group():
+    from soccerhub.agent import _root_cause
+
+    leaf = KeyError("GEMINI_API_KEY")
+    group = ExceptionGroup("unhandled errors in a TaskGroup", [leaf])
+    assert _root_cause(group) is leaf
+
+
 def test_server_config():
     # Guards the two integration fixes live testing surfaced:
     from soccerhub import agent

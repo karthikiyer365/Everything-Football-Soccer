@@ -40,6 +40,14 @@ def _tool_result_text(result) -> str:
     return "".join(getattr(c, "text", "") for c in result.content)
 
 
+def _root_cause(exc: BaseException) -> BaseException:
+    """Unwrap anyio/asyncio ExceptionGroups to the real leaf exception, so the
+    error message is actionable instead of 'unhandled errors in a TaskGroup'."""
+    while (subs := getattr(exc, "exceptions", None)):
+        exc = subs[0]
+    return exc
+
+
 def ask(
     prompt: str,
     images: list[bytes] | None = None,
@@ -55,7 +63,8 @@ def ask(
     except SoccerhubError:
         raise
     except Exception as e:  # API / transport / unrecovered tool error
-        raise SoccerhubError(str(e)) from e
+        cause = _root_cause(e)
+        raise SoccerhubError(f"{type(cause).__name__}: {cause}") from e
 
 
 async def _run(prompt: str, images: list[bytes], model: str) -> str:
