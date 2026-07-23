@@ -1,0 +1,8 @@
+# Proxy the site's /api/ask to the Render backend so the browser calls a
+# same-origin path (no CORS, backend URL stays out of the frontend).
+# Replace the Render URL below with your deployed service URL.
+[[redirects]]
+  from = "/api/ask"
+  to = "https://soccerhub-agent.onrender.com/ask"
+  status = 200
+  force = true

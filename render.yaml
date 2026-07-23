@@ -1,0 +1,21 @@
+# Render blueprint for the soccerhub agent HTTP endpoint (Layer 3).
+# Set the secret env vars in the Render dashboard (sync: false = not in repo):
+#   GEMINI_API_KEY, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, AGENT_CORS_ORIGINS
+# AGENT_CORS_ORIGINS = your site origin, e.g. https://your-site.netlify.app
+services:
+  - type: web
+    name: soccerhub-agent
+    runtime: python
+    plan: free
+    buildCommand: cd "Soccer Data Hub" && pip install -e ".[api]"
+    startCommand: uvicorn soccerhub.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: AGENT_CORS_ORIGINS
+        sync: false
