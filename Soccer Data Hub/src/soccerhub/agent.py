@@ -11,16 +11,33 @@ import os
 import sys
 
 from google import genai
-from google.genai import types
+from google.genai import _mcp_utils, types
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from soccerhub.errors import SoccerhubError
 
-# Run the MCP server as a subprocess of the current interpreter/venv.
-_SERVER = StdioServerParameters(
-    command=sys.executable, args=["-m", "soccerhub.mcp_server"]
+# Spawn the MCP server with the whole package import redirected to stderr, then
+# run on a clean stdout. Importing soccerhub pulls in soccerdata, which logs to
+# stdout at import time; on an stdio server that would corrupt the JSONRPC
+# channel. mcp.run() itself runs *after* the redirect, on the real stdout.
+_LAUNCH = (
+    "import sys, contextlib\n"
+    "with contextlib.redirect_stdout(sys.stderr):\n"
+    "    import soccerhub.mcp_server as _m\n"
+    "_m.mcp.run()\n"
 )
+# Forward the parent environment: without it stdio_client passes only a safe
+# default subset, and hub_table would KeyError on SUPABASE_URL in the subprocess.
+_SERVER = StdioServerParameters(
+    command=sys.executable, args=["-c", _LAUNCH], env=dict(os.environ)
+)
+_MAX_TURNS = 8  # cap the tool-call loop so a confused model can't run forever
+
+
+def _tool_result_text(result) -> str:
+    """Flatten an MCP CallToolResult's content blocks into one string."""
+    return "".join(getattr(c, "text", "") for c in result.content)
 
 
 def ask(
@@ -43,16 +60,39 @@ def ask(
 
 async def _run(prompt: str, images: list[bytes], model: str) -> str:
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    contents = prompt if not images else [
+    contents: list = [
         prompt,
         *(types.Part.from_bytes(data=img, mime_type="image/png") for img in images),
     ]
     async with stdio_client(_SERVER) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            resp = await client.aio.models.generate_content(
-                model=model,
-                contents=contents,
-                config=types.GenerateContentConfig(tools=[session]),
+            # Pass tool *declarations* (picklable) and drive the tool loop by
+            # hand: genai's async generate_content deep-copies the config, which
+            # can't copy a live MCP session held in tools=[session].
+            config = types.GenerateContentConfig(
+                tools=_mcp_utils.mcp_to_gemini_tools((await session.list_tools()).tools)
             )
-    return resp.text
+            for _ in range(_MAX_TURNS):
+                resp = await client.aio.models.generate_content(
+                    model=model, contents=contents, config=config
+                )
+                calls = resp.function_calls
+                if not calls:
+                    return resp.text
+                contents.append(resp.candidates[0].content)  # model's tool-call turn
+                for fc in calls:
+                    result = await session.call_tool(
+                        name=fc.name, arguments=dict(fc.args or {})
+                    )
+                    key = "error" if result.isError else "result"
+                    contents.append(
+                        types.Content(
+                            role="user",
+                            parts=[types.Part.from_function_response(
+                                name=fc.name,
+                                response={key: _tool_result_text(result)},
+                            )],
+                        )
+                    )
+    raise SoccerhubError(f"agent exceeded {_MAX_TURNS} tool-call turns")

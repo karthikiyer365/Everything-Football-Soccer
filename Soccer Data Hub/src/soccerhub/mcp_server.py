@@ -1,3 +1,5 @@
+import logging
+import sys
 from dataclasses import asdict
 
 from mcp.server.fastmcp import FastMCP
@@ -8,6 +10,16 @@ from soccerhub.pipelines.query import read_hub
 from soccerhub.readers.fbref import fetch_fbref_season
 from soccerhub.readers.statsbomb import fetch_statsbomb_events
 from soccerhub.readers.transfermarkt import fetch_transfermarkt_values
+
+# soccerdata attaches a rich console handler (writes to stdout, resolved at
+# write time) to both the true root and the "root" logger. On an MCP stdio
+# server that stream is the JSONRPC channel, so runtime logs would corrupt it.
+# Drop the non-file (console) handlers and route logs to stderr; keep the
+# info/error file handlers. (Import-time logs are handled by the launcher in
+# agent.py, which redirects stdout while importing this package.)
+for _lg in (logging.getLogger(), logging.getLogger("root")):
+    _lg.handlers = [h for h in _lg.handlers if isinstance(h, logging.FileHandler)]
+    _lg.addHandler(logging.StreamHandler(sys.stderr))
 
 mcp = FastMCP("soccerhub")
 
