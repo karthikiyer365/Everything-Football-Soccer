@@ -1,8 +1,8 @@
-"""Wiring smoke test for the Layer-3 agent. No live API / subprocess.
+"""Wiring smoke tests for the Layer-3 agent. No live API / subprocess.
 
-Mocks the genai client + MCP stdio/session boundaries; asserts ask() passes
-the prompt as contents, hands the session straight into tools=[session], and
-returns the model's text — and that failures surface as SoccerhubError.
+Mocks the genai client + MCP stdio/session boundaries; asserts ask() builds
+contents from the prompt (+ image Parts), drives the tool-call loop against
+the MCP session, and surfaces failures as SoccerhubError.
 """
 import pytest
 
@@ -23,31 +23,65 @@ class _ACM:
 
 
 class _AsyncCall:
-    """Async callable that records kwargs and returns (or raises) a fixed result."""
+    """Async callable returning fixed results in sequence (last repeats)."""
 
-    def __init__(self, result):
-        self._result = result
+    def __init__(self, results):
+        self._results = results if isinstance(results, list) else [results]
+        self._i = 0
         self.calls = []
 
     async def __call__(self, **kwargs):
         self.calls.append(kwargs)
-        if isinstance(self._result, Exception):
-            raise self._result
-        return self._result
+        r = self._results[min(self._i, len(self._results) - 1)]
+        self._i += 1
+        if isinstance(r, Exception):
+            raise r
+        return r
 
 
-def _wire(monkeypatch, gen_result):
-    """Patch agent's genai/stdio/session boundaries. Returns (session, gen_call)."""
+def _resp(text=None, calls=None):
+    """Fake GenerateContentResponse. calls = [(name, args), ...] → function_calls."""
+    fcs = [type("FC", (), {"name": n, "args": a})() for n, a in (calls or [])]
+    candidate = type("Cand", (), {"content": "MODEL_TURN"})()
+    return type(
+        "Resp",
+        (),
+        {"text": text, "function_calls": fcs or None, "candidates": [candidate]},
+    )()
+
+
+def _tool_result(text, is_error=False):
+    return type(
+        "CallToolResult",
+        (),
+        {"content": [type("Text", (), {"text": text})()], "isError": is_error},
+    )()
+
+
+def _wire(monkeypatch, gen_results, tool_result=None):
+    """Patch agent's genai/stdio/session boundaries. Returns (session, gen)."""
     from soccerhub import agent
 
     async def _init():
         return None
 
-    session = type("Session", (), {"initialize": staticmethod(_init)})()
+    async def _list_tools():
+        return type("ListTools", (), {"tools": []})()  # no tools → empty declarations
+
+    call_tool = _AsyncCall(tool_result or _tool_result("DATA"))
+    session = type(
+        "Session",
+        (),
+        {
+            "initialize": staticmethod(_init),
+            "list_tools": staticmethod(_list_tools),
+            "call_tool": call_tool,
+        },
+    )()
     monkeypatch.setattr(agent, "stdio_client", lambda server: _ACM((None, None)))
     monkeypatch.setattr(agent, "ClientSession", lambda read, write: _ACM(session))
 
-    gen = _AsyncCall(gen_result)
+    gen = _AsyncCall(gen_results)
     client = type("Client", (), {})()
     client.aio = type("Aio", (), {})()
     client.aio.models = type("Models", (), {"generate_content": gen})()
@@ -58,22 +92,24 @@ def _wire(monkeypatch, gen_result):
 
 
 def test_ask_returns_model_text(monkeypatch):
-    resp = type("Resp", (), {"text": "Messi leads with 12 xG."})()
-    session, gen = _wire(monkeypatch, resp)
+    _wire(monkeypatch, _resp(text="Messi leads with 12 xG."))
 
     from soccerhub.agent import ask
 
-    out = ask("who leads La Liga in xG?")
+    assert ask("who leads La Liga in xG?") == "Messi leads with 12 xG."
 
-    assert out == "Messi leads with 12 xG."
-    kwargs = gen.calls[0]
-    assert kwargs["contents"] == "who leads La Liga in xG?"
-    assert kwargs["config"].tools == [session]  # session handed straight to tools
+
+def test_ask_builds_contents_from_prompt(monkeypatch):
+    _session, gen = _wire(monkeypatch, _resp(text="ok"))
+
+    from soccerhub.agent import ask
+
+    ask("interpret this")
+    assert gen.calls[0]["contents"] == ["interpret this"]  # prompt first, no images
 
 
 def test_ask_sends_images(monkeypatch):
-    resp = type("Resp", (), {"text": "The radar shows an elite passer."})()
-    _session, gen = _wire(monkeypatch, resp)
+    _session, gen = _wire(monkeypatch, _resp(text="The radar shows an elite passer."))
 
     from soccerhub.agent import ask
 
@@ -83,6 +119,35 @@ def test_ask_sends_images(monkeypatch):
     contents = gen.calls[0]["contents"]
     assert contents[0] == "interpret this chart"  # prompt first
     assert len(contents) == 2  # prompt + one image Part
+
+
+def test_ask_runs_tool_loop(monkeypatch):
+    # turn 1: model calls a tool; turn 2: model answers with the tool data.
+    session, gen = _wire(
+        monkeypatch,
+        [_resp(calls=[("hub_table", {"table": "player_season"})]), _resp(text="Done.")],
+        tool_result=_tool_result("row1,row2"),
+    )
+
+    from soccerhub.agent import ask
+
+    out = ask("query the hub")
+
+    assert out == "Done."
+    assert session.call_tool.calls[0] == {
+        "name": "hub_table",
+        "arguments": {"table": "player_season"},
+    }
+    assert len(gen.calls) == 2  # looped: called the model twice
+    assert len(gen.calls[1]["contents"]) > 1  # fed the tool response back
+
+
+def test_server_config():
+    # Guards the two integration fixes live testing surfaced:
+    from soccerhub import agent
+
+    assert agent._SERVER.args[0] == "-c"  # launcher redirects import-time stdout
+    assert "PATH" in (agent._SERVER.env or {})  # parent env forwarded to subprocess
 
 
 def test_ask_wraps_errors(monkeypatch):
