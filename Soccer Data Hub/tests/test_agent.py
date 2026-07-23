@@ -71,6 +71,20 @@ def test_ask_returns_model_text(monkeypatch):
     assert kwargs["config"].tools == [session]  # session handed straight to tools
 
 
+def test_ask_sends_images(monkeypatch):
+    resp = type("Resp", (), {"text": "The radar shows an elite passer."})()
+    _session, gen = _wire(monkeypatch, resp)
+
+    from soccerhub.agent import ask
+
+    out = ask("interpret this chart", images=[b"\x89PNG-fake-bytes"])
+
+    assert out == "The radar shows an elite passer."
+    contents = gen.calls[0]["contents"]
+    assert contents[0] == "interpret this chart"  # prompt first
+    assert len(contents) == 2  # prompt + one image Part
+
+
 def test_ask_wraps_errors(monkeypatch):
     _wire(monkeypatch, ValueError("boom"))
 
