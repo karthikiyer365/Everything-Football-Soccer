@@ -1,5 +1,6 @@
 """soccerhub — unified fetch layer for open-source soccer data."""
 
+from soccerhub.agent import ask
 from soccerhub.errors import SoccerhubError
 from soccerhub.manifest import Manifest
 from soccerhub.readers.clubelo import fetch_club_elo_history, fetch_club_elo_snapshot
@@ -29,6 +30,7 @@ from soccerhub.pipelines import (
 )
 
 __all__ = [
+    "ask",
     "SoccerhubError",
     "Manifest",
     "fetch_club_elo_history",

@@ -123,7 +123,7 @@ ERROR PATHS (either branch):
 def ask(
     prompt: str,
     images: list[bytes] | None = None,
-    model: str = "gemini-2.5-flash",
+    model: str = "gemini-3-flash-preview",
 ) -> str:
     """Ask the soccerhub agent a question. Calls MCP tools as needed."""
 ```
