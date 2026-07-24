@@ -51,7 +51,7 @@ def _root_cause(exc: BaseException) -> BaseException:
 def ask(
     prompt: str,
     images: list[bytes] | None = None,
-    model: str = "gemini-3-flash-preview",
+    model: str = "gemini-3.6-flash",  # stable GA flash; preview/2.5 models 503/reject under load
 ) -> str:
     """Ask the soccerhub agent a question. Calls MCP tools as needed; returns text.
 
