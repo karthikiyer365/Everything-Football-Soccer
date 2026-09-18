@@ -412,7 +412,8 @@ async function render(){
   const s = sel();
   const rows = s==="career" ? career : career.filter(r=>r.season===s);
   const shotRows = s==="career" ? shots : shots.filter(r=>r.season===s);
-  const span = `${seasons[0]}–${seasons[seasons.length-1]}`;
+  const span = seasons[0] === seasons[seasons.length-1]
+    ? `${seasons[0]}` : `${seasons[0]}–${seasons[seasons.length-1]}`;
   document.title = `${srow.player_name} — technical profile`;
 
   document.getElementById("main").innerHTML = `
@@ -422,6 +423,9 @@ async function render(){
       ${esc(srow.league.split("-")[1] ?? srow.league)} ·
       ${s==="career" ? `career ${span}` : "best year "+esc(s)}</span>
   </header>
+  <p class="meta" style="margin:-6px 0 14px">Shot-level xG data begins ${XG_SINCE}–15;
+    seasons before then appear only as totals on the
+    <a href="player.html?tm=${encodeURIComponent(srow.tm_id)}">value card</a>.</p>
   <div class="chips nums" id="chips">
     <button data-s="career" aria-pressed="${s==="career"}">Career</button>
     ${best ? `<button data-s="${esc(best)}" aria-pressed="${s===best}">Best year · ${esc(best)}</button>` : ""}
@@ -632,7 +636,9 @@ function drawGameProfile(shotRows, rows){
   // defensive counts come from the season rows (we have won + interceptions;
   // attempts need FBref's defense page, which we don't ingest)
   const sum = k => rows.reduce((a,r)=>a+(r[k] ?? 0), 0);
-  const tkl = sum("tackles_won"), intc = sum("interceptions");
+  const has = k => rows.some(r=>r[k]!=null);   // null (no data) must not read as 0
+  const tkl = has("tackles_won") ? sum("tackles_won") : null;
+  const intc = has("interceptions") ? sum("interceptions") : null;
 
   const foot = k => np.filter(r=>r.body_part===k).length;
   const pctShots = n => np.length ? Math.round(100*n/np.length) : 0;
@@ -648,8 +654,8 @@ function drawGameProfile(shotRows, rows){
       ${count("Shots", shotRows.length, shotRows.length-np.length ? (shotRows.length-np.length)+" pen" : "")}
       ${count("Goals", goals, `${np.reduce((a,r)=>a+r.xg,0).toFixed(1)} npxG`)}
       ${count("Mode distance", np.length? modeD+"m":"—", "most common")}
-      ${count("Tackles won", tkl, "attempts n/a")}
-      ${count("Interceptions", intc)}
+      ${count("Tackles won", tkl ?? "—", tkl==null ? "not in dataset" : "attempts n/a")}
+      ${count("Interceptions", intc ?? "—")}
     </div>
     <div class="gamerow nums">
       ${icon(`<span style="display:inline-block;transform:scaleX(-1)">🦶</span>`,"Left foot",pctShots(foot("Left Foot"))+"%")}
