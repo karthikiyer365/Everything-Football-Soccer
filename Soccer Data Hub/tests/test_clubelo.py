@@ -23,7 +23,7 @@ def test_fetch_club_elo_snapshot_renames_and_tags_date(monkeypatch):
             return fake
 
     captured = {}
-    monkeypatch.setattr(ce.sd, "ClubElo", FakeClubElo)
+    monkeypatch.setattr("soccerdata.ClubElo", FakeClubElo)
 
     m = ce.fetch_club_elo_snapshot("2023-08-11")
     assert captured["date"] == "2023-08-11"
@@ -44,7 +44,7 @@ def test_fetch_club_elo_snapshot_default_date_is_todays_cache_key(monkeypatch):
          "league": ["ENG-Premier League"]},
         index=pd.Index(["Arsenal"], name="team"),
     )
-    monkeypatch.setattr(ce.sd, "ClubElo",
+    monkeypatch.setattr("soccerdata.ClubElo",
                         lambda: type("X", (), {"read_by_date": lambda self, d: fake})())
 
     today = pd.Timestamp.now().strftime("%Y-%m-%d")
@@ -70,7 +70,7 @@ def test_fetch_club_elo_history_drops_forward_placeholder(monkeypatch):
         def read_team_history(self, team):
             return fake
 
-    monkeypatch.setattr(ce.sd, "ClubElo", FakeClubElo)
+    monkeypatch.setattr("soccerdata.ClubElo", FakeClubElo)
     m = ce.fetch_club_elo_history("Arsenal")
     df = pd.read_parquet(m.path)
     # pre-2008 row and the future placeholder both dropped

@@ -36,11 +36,6 @@ def _patch_league_config() -> None:
         cfg.write_text(json.dumps(data, indent=2))
 
 
-_patch_league_config()
-
-import soccerdata as sd  # noqa: E402  — config file must exist before this import
-
-
 def _season_to_code(season: str) -> str:
     """Start year -> soccerdata's unambiguous 4-digit code: '2021' -> '2122'.
 
@@ -59,6 +54,8 @@ def fetch_fbref_season(
     ``season`` is the canonical start year ('2021' = 2021-22 season).
     ``stat_type`` is any table soccerdata supports (standard, defense, keeper…).
     """
+    _patch_league_config()  # must precede the first soccerdata import in-process
+    import soccerdata as sd  # lazy: keeps the heavy scraper stack off import time
 
     def produce():
         return sd.FBref(

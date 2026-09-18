@@ -64,3 +64,8 @@ output/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# ── Claude Code tooling state (local, not project code) ───────────
+.agents/
+.claude/
+skills-lock.json

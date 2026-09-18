@@ -2,11 +2,10 @@
 import logging
 
 import pandas as pd
-import soccerdata as sd
 
 from soccerhub.cache import cached_fetch
 from soccerhub.manifest import Manifest
-from soccerhub.readers.fbref import _season_to_code
+from soccerhub.readers.fbref import _patch_league_config, _season_to_code
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +26,8 @@ def fetch_understat(league: str, season: str, dataset: str = "player_season",
     """
     if dataset not in DATASETS:
         raise ValueError(f"dataset must be one of {sorted(DATASETS)}")
+    _patch_league_config()  # must precede the first soccerdata import in-process
+    import soccerdata as sd  # lazy: keeps the heavy scraper stack off import time
 
     def produce():
         u = sd.Understat(leagues=league, seasons=_season_to_code(season))

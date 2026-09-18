@@ -18,7 +18,7 @@ def test_fetch_statsbomb_events_converts_dataset_to_df(monkeypatch):
         assert match_id == "3788741"
         return FakeDataset()
 
-    monkeypatch.setattr(sb.statsbomb, "load_open_data", fake_load_open_data)
+    monkeypatch.setattr("kloppy.statsbomb.load_open_data", fake_load_open_data)
 
     m = sb.fetch_statsbomb_events("3788741")
     assert m.source == "statsbomb"

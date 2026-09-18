@@ -24,7 +24,7 @@ def test_fetch_passes_unambiguous_code(tmp_path, monkeypatch):
             captured["stat_type"] = stat_type
             return pd.DataFrame({"x": [1]})
 
-    monkeypatch.setattr(fb.sd, "FBref", FakeFBref)
+    monkeypatch.setattr("soccerdata.FBref", FakeFBref)
     m = fb.fetch_fbref_season("ENG-Premier League", "2021")
     assert captured["seasons"] == "2122"
     assert captured["stat_type"] == "standard"
@@ -61,7 +61,7 @@ def test_fetch_fbref_season_caches_reader_output(monkeypatch):
         def read_player_season_stats(self, stat_type="standard"):
             return pd.DataFrame({"player": ["A", "B"], "goals": [3, 1]})
 
-    monkeypatch.setattr(fbref.sd, "FBref", FakeFBref)
+    monkeypatch.setattr("soccerdata.FBref", FakeFBref)
 
     m = fbref.fetch_fbref_season("ENG-Premier League", "2023")
     assert m.source == "fbref"

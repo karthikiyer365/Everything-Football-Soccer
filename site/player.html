@@ -116,12 +116,27 @@
   .ask-row{display:flex;gap:8px;margin:10px 0 4px}
   .ask-row input{flex:1;padding:9px 14px;border-radius:999px;border:1px solid var(--border);
        background:var(--grass);color:var(--line);font:inherit;font-size:.95rem}
+  #ask-model{padding:6px 10px;border-radius:999px;border:1px solid var(--border);
+       background:var(--grass);color:var(--muted);font:inherit;font-size:.85rem}
+  #ask-model:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
   .ask-row input:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
   .ask-row button{padding:9px 18px;border-radius:999px;border:0;background:var(--amber);
        color:#20160a;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}
   .ask-row button[disabled]{opacity:.5;cursor:default}
   #ask-out{margin:6px 0 0;font-size:.95rem;color:var(--line);white-space:pre-wrap;min-height:1.4em}
   #ask-out.dim{color:var(--muted)}
+  #ask-out h3{font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--amber);
+       margin:16px 0 6px;white-space:normal}
+  #ask-out h3:first-child{margin-top:4px}
+  #ask-out p{margin:0 0 8px;white-space:normal;line-height:1.5}
+  #ask-out ul{margin:0 0 8px;padding-left:18px;white-space:normal;line-height:1.5}
+  #ask-out li{margin:2px 0}
+  #ask-out table{width:100%;border-collapse:collapse;margin:4px 0 10px;font-size:.85rem;white-space:normal}
+  #ask-out th,#ask-out td{padding:5px 8px;border-bottom:1px solid var(--border);text-align:left}
+  #ask-out th{color:var(--muted);font-weight:600;font-size:.75rem;text-transform:uppercase}
+  #ask-out td:first-child,#ask-out th:first-child{padding-left:0}
+  #ask-out table{display:block;overflow-x:auto}
+  #ask-out strong{color:var(--amber);font-weight:600}
 
   details.season-log{margin-top:22px;background:var(--card);border:1px solid var(--border);
        border-radius:4px}
@@ -497,11 +512,19 @@ function render(rows, moves, srow, peers, seasons, curve = []){
     <h2><span class="swatch" style="background:var(--blue)"></span>Ask the analyst
       <span style="color:var(--muted);letter-spacing:0;text-transform:none">· AI over the hub data</span></h2>
     <div class="ask-row">
+      <select id="ask-model">
+        <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+        <option value="gemini-3.6-flash" selected>Gemini 3.6 Flash</option>
+        <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+        <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+      </select>
+    </div>
+    <div class="ask-row">
       <input id="ask-q" type="text" autocomplete="off"
         placeholder="e.g. How does this player compare to his positional peers?">
       <button id="ask-go" type="button">Ask</button>
     </div>
-    <p id="ask-out" class="dim">Answers use live hub data via the agent. Free-text — one question at a time.</p>
+    <div id="ask-out" class="dim">Answers use live hub data via the agent. Free-text — one question at a time.</div>
   </section>
   ${moves.length ? `
   <details class="season-log">
@@ -555,9 +578,50 @@ function render(rows, moves, srow, peers, seasons, curve = []){
     history.pushState({}, "", u);
     load();
   });
+  // Renders the narrow markdown subset the agent's system prompt is locked to
+  // (## headers, **bold**, - bullets, pipe tables). Keep in sync with
+  // Soccer Data Hub/src/soccerhub/agent.py _SYSTEM_INSTRUCTION.
+  function renderAskMd(md){
+    const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    const bold = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    const lines = md.split("\n");
+    let html = "", i = 0;
+    while(i < lines.length){
+      const line = lines[i];
+      if(/^##\s+/.test(line)){
+        html += `<h3>${bold(line.replace(/^##\s+/, ""))}</h3>`;
+        i++;
+      } else if(/^\|.+\|\s*$/.test(line)){
+        const rows = [];
+        while(i < lines.length && /^\|.+\|\s*$/.test(lines[i])){
+          rows.push(lines[i].trim().slice(1, -1).split("|").map(c => c.trim()));
+          i++;
+        }
+        const isSep = r => r.every(c => /^:?-+:?$/.test(c));
+        const head = rows[0], body = rows[isSep(rows[1] || []) ? 2 : 1] ? rows.slice(isSep(rows[1] || []) ? 2 : 1) : [];
+        html += "<table><thead><tr>" + head.map(c => `<th>${bold(c)}</th>`).join("") + "</tr></thead><tbody>"
+          + body.map(r => "<tr>" + r.map(c => `<td>${bold(c)}</td>`).join("") + "</tr>").join("")
+          + "</tbody></table>";
+      } else if(/^-\s+/.test(line)){
+        const items = [];
+        while(i < lines.length && /^-\s+/.test(lines[i])){
+          items.push(lines[i].replace(/^-\s+/, ""));
+          i++;
+        }
+        html += "<ul>" + items.map(it => `<li>${bold(it)}</li>`).join("") + "</ul>";
+      } else if(line.trim() === ""){
+        i++;
+      } else {
+        html += `<p>${bold(line)}</p>`;
+        i++;
+      }
+    }
+    return html;
+  }
   const askQ = document.getElementById("ask-q");
   const askGo = document.getElementById("ask-go");
   const askOut = document.getElementById("ask-out");
+  const askModel = document.getElementById("ask-model");
   async function doAsk(){
     const q = askQ.value.trim();
     if(!q) return;
@@ -568,12 +632,12 @@ function render(rows, moves, srow, peers, seasons, curve = []){
     try {
       const r = await fetch(AGENT_ENDPOINT, {
         method: "POST", headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ prompt, model: askModel.value })
       });
       const data = await r.json().catch(() => ({}));
       if(!r.ok) throw new Error(data.detail || r.statusText);
       askOut.className = "";
-      askOut.textContent = data.answer || "(no answer)";
+      askOut.innerHTML = data.answer ? renderAskMd(data.answer) : "(no answer)";
     } catch(e){
       askOut.className = "dim";
       askOut.textContent = "Agent unavailable: " + e.message;
