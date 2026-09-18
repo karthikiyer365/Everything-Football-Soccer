@@ -116,6 +116,9 @@
   .ask-row{display:flex;gap:8px;margin:10px 0 4px}
   .ask-row input{flex:1;padding:9px 14px;border-radius:999px;border:1px solid var(--border);
        background:var(--grass);color:var(--line);font:inherit;font-size:.95rem}
+  #ask-model{padding:6px 10px;border-radius:999px;border:1px solid var(--border);
+       background:var(--grass);color:var(--muted);font:inherit;font-size:.85rem}
+  #ask-model:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
   .ask-row input:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
   .ask-row button{padding:9px 18px;border-radius:999px;border:0;background:var(--amber);
        color:#20160a;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}
@@ -509,6 +512,14 @@ function render(rows, moves, srow, peers, seasons, curve = []){
     <h2><span class="swatch" style="background:var(--blue)"></span>Ask the analyst
       <span style="color:var(--muted);letter-spacing:0;text-transform:none">· AI over the hub data</span></h2>
     <div class="ask-row">
+      <select id="ask-model">
+        <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+        <option value="gemini-3.6-flash" selected>Gemini 3.6 Flash</option>
+        <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+        <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+      </select>
+    </div>
+    <div class="ask-row">
       <input id="ask-q" type="text" autocomplete="off"
         placeholder="e.g. How does this player compare to his positional peers?">
       <button id="ask-go" type="button">Ask</button>
@@ -610,6 +621,7 @@ function render(rows, moves, srow, peers, seasons, curve = []){
   const askQ = document.getElementById("ask-q");
   const askGo = document.getElementById("ask-go");
   const askOut = document.getElementById("ask-out");
+  const askModel = document.getElementById("ask-model");
   async function doAsk(){
     const q = askQ.value.trim();
     if(!q) return;
@@ -620,7 +632,7 @@ function render(rows, moves, srow, peers, seasons, curve = []){
     try {
       const r = await fetch(AGENT_ENDPOINT, {
         method: "POST", headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ prompt, model: askModel.value })
       });
       const data = await r.json().catch(() => ({}));
       if(!r.ok) throw new Error(data.detail || r.statusText);
