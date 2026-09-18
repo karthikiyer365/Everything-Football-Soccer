@@ -32,7 +32,39 @@ _LAUNCH = (
 _SERVER = StdioServerParameters(
     command=sys.executable, args=["-c", _LAUNCH], env=dict(os.environ)
 )
-_MAX_TURNS = 8  # cap the tool-call loop so a confused model can't run forever
+_MAX_TURNS = 5  # cap the tool-call loop so a confused model can't run forever
+
+# Locks the answer to a fixed 5-section shape + a narrow markdown subset the
+# frontend renderer (site/player.html renderAskMd) knows how to draw. Keep
+# these two in sync: adding a markdown element here without frontend support
+# renders as literal ###/** text.
+_SYSTEM_INSTRUCTION = """\
+You are a football analytics assistant. Answer using ONLY this structure, in \
+this exact order, and nothing outside it (no preamble, no closing summary):
+
+## Statistical Overview
+A markdown table comparing the subject to 4-6 relevant peers on the stats \
+the question calls for.
+
+## Peer Comparison
+1-3 bullet points, one sentence each.
+
+## xG/Shot & xA/Pass
+1-3 bullet points on shot volume/quality and chance creation, one sentence each.
+
+## Key Takeaways
+2-3 bullet points, one sentence each.
+
+## Projected Fit
+1-2 sentences: which team system/tactical profile he'd suit and why.
+
+Formatting rules — use ONLY these markdown elements:
+- `##` for the 5 section headers above, nothing else uses `##` or `###`.
+- `**bold**` for stat values only, never whole sentences.
+- `- ` for bullets, never `*` or numbered lists.
+- Pipe tables (`| a | b |`) only in Statistical Overview.
+- No horizontal rules (`---`), no other markdown.
+Keep prose outside the table under 150 words total."""
 
 
 def _tool_result_text(result) -> str:
@@ -79,12 +111,25 @@ async def _run(prompt: str, images: list[bytes], model: str) -> str:
             # Pass tool *declarations* (picklable) and drive the tool loop by
             # hand: genai's async generate_content deep-copies the config, which
             # can't copy a live MCP session held in tools=[session].
+            tools = _mcp_utils.mcp_to_gemini_tools((await session.list_tools()).tools)
             config = types.GenerateContentConfig(
-                tools=_mcp_utils.mcp_to_gemini_tools((await session.list_tools()).tools)
+                system_instruction=_SYSTEM_INSTRUCTION, tools=tools
             )
-            for _ in range(_MAX_TURNS):
+            # Last turn: disable function calling outright so the API can't
+            # return another tool call — it must answer with what it has.
+            final_config = types.GenerateContentConfig(
+                system_instruction=_SYSTEM_INSTRUCTION
+                + "\n\nYou have no more tool calls left — answer now from what "
+                "you've already gathered, following the structure above.",
+                tools=tools,
+                tool_config=types.ToolConfig(
+                    function_calling_config=types.FunctionCallingConfig(mode="NONE")
+                ),
+            )
+            for turn in range(_MAX_TURNS):
+                is_last = turn == _MAX_TURNS - 1
                 resp = await client.aio.models.generate_content(
-                    model=model, contents=contents, config=config
+                    model=model, contents=contents, config=final_config if is_last else config
                 )
                 calls = resp.function_calls
                 if not calls:
