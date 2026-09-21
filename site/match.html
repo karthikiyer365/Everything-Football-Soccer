@@ -15,6 +15,8 @@
 
   main{max-width:1060px;margin:0 auto;padding:24px 20px 80px}
 
+  .chips{margin:0 0 10px}
+
   /* team picker */
   .picker{position:relative;margin:6px 0 0}
   .picker .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -64,6 +66,7 @@
   #teamsearch::placeholder{color:var(--kick)}
   #teamsearch:focus-visible{outline-color:var(--accent)}
   #teamlist{background:#fff;border-color:var(--rule);
+       box-shadow:0 8px 24px rgba(16,24,40,.08)}
   #teamlist button{color:var(--ink)}
   #teamlist button:hover,#teamlist button:focus-visible{background:#f1f8f4}
   #teamlist button[disabled]{color:var(--kick)}
@@ -109,6 +112,7 @@
 <script>
 const SUPABASE_URL = "https://rgnzemkdldohplwbxxwy.supabase.co";
 const ANON_KEY = "sb_publishable_Qy0bJ4CdrxffuJGNq12ebw_r0-Z3qD-";
+const DEFAULT_TEAMS = ["Chelsea","Arsenal","Tottenham"];
 const LEAGUES = ["ENG-Premier League","ESP-La Liga","GER-Bundesliga",
                  "ITA-Serie A","FRA-Ligue 1"];
 const SEASONS = Array.from({length: 18}, (_,i)=>String(2008+i));
@@ -157,10 +161,15 @@ const hideTip = () => tipEl().style.display="none";
 /* ---------- state via URL ---------- */
 const state = () => {
   const u = new URLSearchParams(location.search);
+  const lg = LEAGUES.includes(u.get("lg")) ? u.get("lg") : LEAGUES[0];
   return {
-    lg: LEAGUES.includes(u.get("lg")) ? u.get("lg") : LEAGUES[0],
+    lg,
     ss: SEASONS.includes(u.get("s")) ? u.get("s") : SEASONS[SEASONS.length-1],
-    teams: (u.get("teams") || "").split(",").filter(Boolean).slice(0, MAX_SEL),
+    // with nothing picked the chart is empty; open on a comparison worth
+    // seeing — but only in the league those clubs actually play in
+    teams: u.has("teams")
+      ? u.get("teams").split(",").filter(Boolean).slice(0, MAX_SEL)
+      : (lg === LEAGUES[0] ? DEFAULT_TEAMS.slice() : []),
   };
 };
 function setState(patch){

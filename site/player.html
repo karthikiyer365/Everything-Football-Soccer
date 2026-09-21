@@ -64,6 +64,7 @@
   /* ---------- season chips ---------- */
 
   /* ---------- tab bar ---------- */
+  .chips{margin:26px 0 0}
   .tabs{display:flex;align-items:stretch;margin:18px 0 0;border-bottom:1px solid var(--border)}
   .tabs button{border:0;background:none;color:var(--muted);font:inherit;font-size:.82rem;
        letter-spacing:.1em;text-transform:uppercase;padding:12px 22px;cursor:pointer;
@@ -213,6 +214,7 @@
   #search::placeholder{color:var(--kick)}
   #search:focus-visible{outline-color:var(--accent)}
   #results{background:#fff;border-color:var(--rule);
+       box-shadow:0 8px 24px rgba(16,24,40,.08)}
   #results button{color:var(--ink)}
   #results button:hover,#results button:focus-visible{background:#f1f8f4}
   #results .sub{color:var(--kick)}
@@ -376,13 +378,21 @@ function pushUrl({s, tab, vs} = {}){
 }
 
 /* ---------- load ---------- */
+// Landing on the dashboard with no player shows an empty search box and
+// nothing else. Open on someone whose career exercises every surface:
+// pre-2014 seasons without xG, a mid-career move, and a full shot map.
+const DEFAULT_TM = "50202";   // Eden Hazard
+
 window.addEventListener("popstate", load);
 load();
 
 async function load(){
   const u = qs();
   const main = document.getElementById("main");
-  if(!u.has("tm") && !u.has("name")) return;
+  if(!u.has("tm") && !u.has("name")){
+    history.replaceState({}, "", `?tm=${DEFAULT_TM}`);
+    return load();
+  }
   main.innerHTML = `<div class="empty">Loading…</div>`;
 
   const params = {select: "*", order: "season"};
