@@ -103,26 +103,6 @@
        border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-size:.8rem;
        color:var(--line);box-shadow:0 4px 16px rgba(0,0,0,.5);max-width:230px}
   #tip .t{color:var(--tag);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
-  .sectiongap{border-top:1px solid var(--border);margin:4px 0 0;padding-top:18px}
-  .scopelabel{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--tag);
-       margin:0 0 10px}
-
-  /* ---------- value tab: percentile bars ---------- */
-  .bar{display:grid;grid-template-columns:104px 1fr 96px;gap:10px;align-items:center;
-       font-size:12px;margin:8px 0}
-  .bar label{letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
-  .bar .track{height:9px;border-radius:5px;background:rgba(242,245,239,.14);overflow:hidden}
-  .bar .fill{height:100%;border-radius:5px}
-  .bar b{text-align:right}
-  .bar .raw{color:var(--muted);font-weight:400;margin-right:8px}
-  .cardrow{display:grid;grid-template-columns:104px 1fr;gap:10px;align-items:center;
-       font-size:12px;margin:10px 0}
-  .cardrow label{letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
-  .cardrow .dots{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
-  .cardrow .yc,.cardrow .rc{width:9px;height:12px;border-radius:2px;display:inline-block}
-  .cardrow .yc{background:#f5c542}
-  .cardrow .rc{background:#e0524a}
-  .cardrow .rate{color:var(--muted);margin-left:8px}
 
   /* ---------- technical tab: game profile ---------- */
   .gamerow{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px}
@@ -192,47 +172,6 @@
   .axlist .r span:first-child{color:var(--muted)}
   .axlist .r .raw{text-align:right;color:var(--muted)}
   .axlist .r b{text-align:right}
-
-  /* ---------- ask tab ---------- */
-  .ask-row{display:flex;gap:8px;margin:10px 0 4px}
-  .ask-row input{flex:1;padding:9px 14px;border-radius:999px;border:1px solid var(--border);
-       background:var(--grass);color:var(--line);font:inherit;font-size:.95rem}
-  #ask-model{padding:6px 10px;border-radius:999px;border:1px solid var(--border);
-       background:var(--grass);color:var(--muted);font:inherit;font-size:.85rem}
-  #ask-model:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
-  .ask-row input:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
-  .ask-row button{padding:9px 18px;border-radius:999px;border:0;background:var(--amber);
-       color:#20160a;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}
-  .ask-row button[disabled]{opacity:.5;cursor:default}
-  #ask-out{margin:6px 0 0;font-size:.95rem;color:var(--line);white-space:pre-wrap;min-height:1.4em}
-  #ask-out.dim{color:var(--muted)}
-  #ask-out h3{font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--amber);
-       margin:16px 0 6px;white-space:normal}
-  #ask-out h3:first-child{margin-top:4px}
-  #ask-out p{margin:0 0 8px;white-space:normal;line-height:1.5}
-  #ask-out ul{margin:0 0 8px;padding-left:18px;white-space:normal;line-height:1.5}
-  #ask-out li{margin:2px 0}
-  #ask-out table{width:100%;border-collapse:collapse;margin:4px 0 10px;font-size:.85rem;
-       white-space:normal;display:block;overflow-x:auto}
-  #ask-out th,#ask-out td{padding:5px 8px;border-bottom:1px solid var(--border);text-align:left}
-  #ask-out th{color:var(--muted);font-weight:600;font-size:.75rem;text-transform:uppercase}
-  #ask-out td:first-child,#ask-out th:first-child{padding-left:0}
-  #ask-out strong{color:var(--amber);font-weight:600}
-
-  /* ---------- logs ---------- */
-  details.season-log{background:var(--card);border:1px solid var(--border);border-radius:4px}
-  details.season-log summary{padding:14px 16px;font-size:.8rem;letter-spacing:.16em;
-       text-transform:uppercase;color:var(--tag);cursor:pointer}
-  details.season-log .scroll{overflow-x:auto}
-  table.log{border-collapse:collapse;width:100%;font-size:.88rem;min-width:640px}
-  table.log th,table.log td{padding:8px 14px;text-align:right;border-top:1px solid rgba(242,245,239,.08)}
-  table.log th{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--tag);
-     font-weight:600}
-  table.log th:first-child,table.log td:first-child,
-  table.log th:nth-child(2),table.log td:nth-child(2),
-  table.log th:nth-child(3),table.log td:nth-child(3){text-align:left}
-  table.log tbody tr:hover{background:rgba(255,180,58,.06)}
-  .dim{color:var(--muted)}
 
   .stub{color:var(--muted);font-size:.9rem;padding:26px 16px;text-align:center;
        border:1px dashed var(--border);border-radius:6px}
@@ -342,7 +281,7 @@ async function runSearch(q){
    ?s= the season ("career" or a season label), ?tab= the open lens,
    ?vs= the radar's comparison players.                                   */
 const TABS = ["technical", "value", "ask"];
-let rows = [], moves = [], seasons = [], peers = [], curve = [];
+let rows = [], seasons = [], peers = [];
 let hasTechnical = false, defaultTab = "value";
 
 const qs = () => new URLSearchParams(location.search);
@@ -397,11 +336,6 @@ async function load(){
 
   try{
     rows = await hub("player_season", params);
-    moves = u.has("tm")
-      ? await hub("transfers",
-          {select:"transfer_date,from_club_name,to_club_name,transfer_fee,market_value_in_eur",
-           tm_id:`eq.${u.get("tm")}`, order:"transfer_date"})
-      : [];
   }catch(e){
     main.innerHTML =
       `<div class="empty">Could not reach the database (${esc(e.message)}). Try again.</div>`;
@@ -429,22 +363,20 @@ async function load(){
 
 // value-scoped peer pool for the hero strip's rating + verdict
 async function loadPeers(){
-  peers = []; curve = [];
+  peers = [];
   const srow = seasonRow();
   if(!srow?.primary_position) return;
-  const [pr, cr] = await Promise.allSettled([
-    hub("player_season", {
+  // losing the pool must not cost the page its render — the strip degrades
+  // to "no market data" on its own
+  try{
+    peers = await hub("player_season", {
       select: "player_name,team,minutes,starts,matches_played,nineties," +
               "non_penalty_goals_assists_per90,market_value_in_eur," +
               "tackles_interceptions_per90,save_pct,clean_sheet_pct,goals_against," +
               "np_xg,xa",
       league: `eq.${srow.league}`, season: `eq.${srow.season}`,
-      primary_position: `eq.${srow.primary_position}`, minutes: `gte.${MIN_MINUTES}`}),
-    hub("age_curve", {select: "age,avg_value_eur",
-      primary_position: `eq.${srow.primary_position}`, order: "age"}),
-  ]);
-  if(pr.status === "fulfilled") peers = pr.value;
-  if(cr.status === "fulfilled") curve = cr.value;
+      primary_position: `eq.${srow.primary_position}`, minutes: `gte.${MIN_MINUTES}`});
+  }catch(e){ /* peers stays [] */ }
 }
 
 // a mid-season mover has two rows; the strip rates the bigger stint
@@ -475,9 +407,6 @@ const conceded90 = r => r.nineties && r.goals_against!=null ? r.goals_against/r.
 // expected output per 90 — the process behind npG+A/90 (Understat, 2014+)
 const npxga90 = r => r.nineties && r.np_xg!=null
   ? (r.np_xg + (r.xa ?? 0)) / r.nineties : null;
-// league seasons: 34 games in the Bundesliga, 38 everywhere else in the big five
-const availability = r => Math.min(1, (r.minutes||0) /
-  ((r.league?.startsWith("GER") ? 34 : 38) * 90));
 
 // position-appropriate output metric drives the rating, verdict and scatter
 const METRIC = {
@@ -586,8 +515,6 @@ function render(){
   const srow = seasonRow();
   const last = rows[rows.length-1];
   const m = cardModel(srow, peers);
-  const clubs = new Set(rows.map(r=>r.team)).size;
-  const peakVal = rows.reduce((a,r)=>Math.max(a, r.market_value_in_eur||0), 0);
   document.title = `${last.player_name} — SoccerHub`;
 
   const s = sel(), best = bestSeason();
@@ -661,7 +588,7 @@ function render(){
     render();            // re-renders the strip too: aria-selected lives there
   });
 
-  renderTab(m, {clubs, peakVal});
+  renderTab(m);
 }
 
 // a new season means a new peer pool for the value-scoped blocks, and the
@@ -673,11 +600,11 @@ async function reloadForSeason(){
 }
 
 /* ---------- tab bodies (stages 2–4) ---------- */
-function renderTab(m, extra){
+function renderTab(m){
   const body = document.getElementById("tabbody");
   const tab = tabSel();
   if(tab === "technical") return renderTechnical(body);
-  if(tab === "value")     return renderValue(body, m, extra);
+  if(tab === "value")     return renderValue(body, m);
   return renderAsk(body);
 }
 
@@ -731,8 +658,8 @@ async function renderTechnical(body){
 
   wireCompare();
   await loadShots();
-  const scopeRows = techScopeRows();
-  const shotRows = s === "career" ? shots : shots.filter(r => r.season === s);
+  const scopeRows = s === "career" ? techRows() : techRows().filter(r => r.season === s);
+  const shotRows  = s === "career" ? shots      : shots.filter(r => r.season === s);
 
   drawGameProfile(shotRows, scopeRows);
   drawBands(shotRows);          // band chips + first paint of the map
@@ -746,7 +673,7 @@ async function renderTechnical(body){
   await drawRadars(s);
 }
 
-function renderValue(body, m, extra){
+function renderValue(body, m){
   body.innerHTML = `<div class="stub">Stage 3 — percentile bars, scatter, career charts, logs</div>`;
 }
 
@@ -762,10 +689,6 @@ function renderAsk(body){
 
 const techRows  = () => rows.filter(r => +r.season >= XG_SINCE);
 const techSrow  = () => techRows()[techRows().length-1] ?? rows[rows.length-1];
-function techScopeRows(){
-  const s = sel();
-  return s === "career" ? techRows() : techRows().filter(r => r.season === s);
-}
 
 let shots = [], shotsPromise = null;
 const peerCache = new Map(), careerCache = new Map();
