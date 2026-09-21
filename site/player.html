@@ -4,14 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Player Dashboard — SoccerHub</title>
-<meta name="description" content="Is the playtime and output on par with the market value? One card per player-season, ranked against positional peers.">
+<meta name="description" content="One page per player: technical profile, value vs output, and career trend, ranked against positional peers.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
 <style>
+  /* merged :root — player.html had no --red although player.html:460 used it */
   :root{
     --grass:#122b1a; --grass-lt:#16321f; --card:#0a1a0e;
     --line:#f2f5ef; --muted:#9fb69c; --tag:#8fae8b; --border:rgba(242,245,239,.22);
     --amber:#ffb43a; --green:#8fd18a; --chalk-y:#e8d47a; --blue:#5aa9f0;
-    --grid:rgba(242,245,239,.10); --axis:rgba(242,245,239,.35);
+    --red:#e0524a; --grid:rgba(242,245,239,.10); --axis:rgba(242,245,239,.35);
   }
   *{box-sizing:border-box}
   html,body{margin:0}
@@ -24,6 +25,7 @@
   .nums{font-variant-numeric:tabular-nums}
   a{color:var(--chalk-y)}
 
+  /* ---------- nav + search ---------- */
   .top{position:sticky;top:0;z-index:5;display:flex;gap:16px;align-items:center;
        padding:12px 20px;background:rgba(5,14,8,.92);backdrop-filter:blur(4px);
        border-bottom:1px solid var(--border)}
@@ -34,53 +36,89 @@
   #search::placeholder{color:var(--tag)}
   #search:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
   #results{position:absolute;top:110%;left:0;right:0;background:var(--card);
-       border:1px solid var(--border);border-radius:6px;overflow:hidden;display:none;
-       max-height:320px;overflow-y:auto}
+       border:1px solid var(--border);border-radius:6px;overflow:hidden auto;display:none;
+       max-height:320px;z-index:7}
   #results button{display:flex;justify-content:space-between;gap:12px;width:100%;
        padding:10px 14px;border:0;background:none;color:var(--line);font:inherit;
        font-size:.9rem;text-align:left;cursor:pointer}
   #results button:hover,#results button:focus-visible{background:rgba(255,180,58,.12);outline:none}
   #results .sub{color:var(--tag);font-size:.8rem;white-space:nowrap}
 
-  main{max-width:1080px;margin:0 auto;padding:24px 20px 80px}
+  main{max-width:1560px;margin:0 auto;padding:24px 20px 80px}
   .empty{color:var(--muted);text-align:center;padding:80px 20px;max-width:46ch;margin:0 auto}
   .empty .disp{color:var(--line);font-size:1.6rem}
 
-  /* season chips */
-  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px}
+  /* ---------- hero strip (flattened .pcard) ---------- */
+  .herostrip{border-radius:14px;padding:18px 24px;
+        background:linear-gradient(160deg,#2a4d2f 0%,#17331e 55%,#0e2413 100%);
+        border:1px solid rgba(255,180,58,.55);
+        box-shadow:0 18px 50px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
+        display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+  .rating{text-align:center;min-width:74px}
+  .rating b{display:block;font-size:46px;line-height:.9;color:var(--amber)}
+  .rating span{font-size:9.5px;letter-spacing:.12em;color:var(--chalk-y)}
+  .idbox{min-width:250px}
+  .idbox h1{margin:0;font-size:30px;line-height:.95}
+  .idbox p{margin:6px 0 0;color:var(--muted);font-size:12.5px}
+  .verdictwrap{display:flex;flex-direction:column;gap:6px}
+  .chip{color:#0e2413;font-weight:800;padding:6px 14px;border-radius:999px;
+        font-size:13px;letter-spacing:.08em;text-align:center}
+  .verdictwrap small{color:var(--muted);font-size:11px}
+  .facts{flex:1;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px;
+         text-align:center;border-left:1px solid rgba(242,245,239,.15);padding-left:24px}
+  .facts label{display:block;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .facts b{font-size:18px}
+  @media(max-width:1100px){.facts{grid-template-columns:repeat(3,minmax(0,1fr));border-left:0;padding-left:0}}
+  /* the old Game profile box, collapsed to one justified line in the strip */
+  .gameline{flex-basis:100%;display:flex;flex-wrap:wrap;justify-content:space-between;
+       gap:6px 18px;margin:14px 0 0;padding-top:12px;
+       border-top:1px solid rgba(242,245,239,.15);font-size:13px}
+  .gameline i{font-style:normal;color:var(--muted);letter-spacing:.08em;
+       text-transform:uppercase;font-size:9.5px;margin-right:4px}
+  .cardnote{margin:10px 0 0;font-size:11.5px;color:var(--muted)}
+  .warn{color:var(--chalk-y);cursor:help}
+
+  /* ---------- season chips ---------- */
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 0}
   .chips button{border:1px solid var(--border);background:var(--card);color:var(--muted);
        border-radius:999px;padding:4px 12px;font:inherit;font-size:.8rem;cursor:pointer}
   .chips button[aria-pressed="true"]{background:var(--amber);color:#20160a;
        border-color:var(--amber);font-weight:700}
   .chips button:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
 
-  /* card + scatter grid */
-  .duo{display:grid;grid-template-columns:390px 1fr;gap:22px;align-items:start}
-  @media(max-width:900px){.duo{grid-template-columns:1fr}}
-  .panel{display:grid;gap:16px}
+  /* ---------- tab bar ---------- */
+  .tabs{display:flex;align-items:stretch;margin:18px 0 0;border-bottom:1px solid var(--border)}
+  .tabs button{border:0;background:none;color:var(--muted);font:inherit;font-size:.82rem;
+       letter-spacing:.1em;text-transform:uppercase;padding:12px 22px;cursor:pointer;
+       border-radius:6px 6px 0 0}
+  .tabs button[aria-selected="true"]{background:var(--amber);color:#20160a;font-weight:700}
+  .tabs button:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
+  #tabbody{padding-top:22px;display:flex;flex-direction:column;gap:22px}
 
-  .pcard{border-radius:18px;padding:24px 24px 20px;
-        background:linear-gradient(160deg,#2a4d2f 0%,#17331e 55%,#0e2413 100%);
-        border:1px solid rgba(255,180,58,.55);
-        box-shadow:0 18px 50px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08)}
-  .pcard .head{display:flex;gap:16px;align-items:flex-start}
-  .rating{text-align:center;min-width:74px}
-  .rating b{display:block;font-size:56px;line-height:.9;color:var(--amber)}
-  .rating span{font-size:10.5px;letter-spacing:.12em;color:var(--chalk-y)}
-  .idbox h1{margin:0;font-size:34px;line-height:.95}
-  .idbox p{margin:6px 0 0;color:var(--muted);font-size:12.5px}
-  .verdict{margin:16px 0 2px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .chip{color:#0e2413;font-weight:800;padding:6px 14px;border-radius:999px;
-        font-size:13px;letter-spacing:.08em}
-  .verdict small{color:var(--muted)}
-  .bar{display:grid;grid-template-columns:92px 1fr 96px;gap:10px;align-items:center;
+  /* ---------- shared box ---------- */
+  .box{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px}
+  .box h2{margin:0 0 10px;font-size:.8rem;letter-spacing:.16em;
+        text-transform:uppercase;color:var(--tag);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .box h2 .plain{color:var(--muted);letter-spacing:0;text-transform:none}
+  .box p.cap{margin:10px 0 0;font-size:12px;color:var(--muted)}
+  .swatch{width:10px;height:10px;border-radius:2px;display:inline-block}
+  .chartbox{position:relative}
+  .chartbox svg{width:100%;height:auto;display:block}
+  svg text{font:10px system-ui;fill:var(--axis)}
+  #tip{position:fixed;z-index:9;pointer-events:none;display:none;background:#050e08;
+       border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-size:.8rem;
+       color:var(--line);box-shadow:0 4px 16px rgba(0,0,0,.5);max-width:230px}
+  #tip .t{color:var(--tag);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
+
+  /* ---------- value tab ---------- */
+  .bar{display:grid;grid-template-columns:104px 1fr 96px;gap:10px;align-items:center;
        font-size:12px;margin:8px 0}
   .bar label{letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
   .bar .track{height:9px;border-radius:5px;background:rgba(242,245,239,.14);overflow:hidden}
   .bar .fill{height:100%;border-radius:5px}
   .bar b{text-align:right}
   .bar .raw{color:var(--muted);font-weight:400;margin-right:8px}
-  .cardrow{display:grid;grid-template-columns:92px 1fr;gap:10px;align-items:center;
+  .cardrow{display:grid;grid-template-columns:104px 1fr;gap:10px;align-items:center;
        font-size:12px;margin:10px 0}
   .cardrow label{letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
   .cardrow .dots{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
@@ -88,69 +126,111 @@
   .cardrow .yc{background:#f5c542}
   .cardrow .rc{background:#e0524a}
   .cardrow .rate{color:var(--muted);margin-left:8px}
-  .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:16px;
-         border-top:1px solid rgba(242,245,239,.15);padding-top:14px;text-align:center}
-  .facts label{display:block;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-  .facts b{font-size:17px}
-  .cardnote{margin:14px 0 0;font-size:11.5px;color:var(--muted)}
-  .warn{color:var(--chalk-y);cursor:help}
+  /* the tab holds two scopes; the label says which one you are reading */
+  .scopelabel{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--tag);
+       margin:26px 0 -6px;padding-top:18px;border-top:1px solid var(--border)}
+  .scopelabel:first-child{margin-top:0;padding-top:0;border-top:0}
+  .scopelabel span{color:var(--muted);letter-spacing:0;text-transform:none}
+  .valueduo{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:22px;
+       align-items:start}
+  @media(max-width:1100px){.valueduo{grid-template-columns:1fr}}
+  details.season-log{background:var(--card);border:1px solid var(--border);border-radius:4px}
+  details.season-log summary{padding:14px 16px;font-size:.8rem;letter-spacing:.16em;
+       text-transform:uppercase;color:var(--tag);cursor:pointer}
+  details.season-log .scroll{overflow-x:auto}
+  table.log{border-collapse:collapse;width:100%;font-size:.88rem;min-width:640px}
+  table.log th,table.log td{padding:8px 14px;text-align:right;border-top:1px solid rgba(242,245,239,.08)}
+  table.log th{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--tag);
+     font-weight:600}
+  table.log th:first-child,table.log td:first-child,
+  table.log th:nth-child(2),table.log td:nth-child(2),
+  table.log th:nth-child(3),table.log td:nth-child(3){text-align:left}
+  table.log tbody tr:hover{background:rgba(255,180,58,.06)}
+  .dim{color:var(--muted)}
 
-  .box{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px}
-  .box h2{margin:0 0 8px;font-size:.8rem;letter-spacing:.16em;
-        text-transform:uppercase;color:var(--tag);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .box h2 .plain{color:var(--muted);letter-spacing:0;text-transform:none}
-  .box p.cap{margin:8px 0 0;font-size:12px;color:var(--muted)}
-  .swatch{width:10px;height:10px;border-radius:2px;display:inline-block}
-  .chartbox{position:relative}
-  .chartbox svg{width:100%;height:auto;display:block}
-  #tip{position:fixed;z-index:9;pointer-events:none;display:none;background:#050e08;
-       border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-size:.8rem;
-       color:var(--line);box-shadow:0 4px 16px rgba(0,0,0,.5)}
-  #tip .t{color:var(--tag);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
+  /* ---------- technical tab: xG band chips + shot map ---------- */
+  .bandchips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+  .band{border:1px solid var(--border);background:rgba(242,245,239,.03);color:var(--muted);
+       border-radius:8px;padding:6px 11px;font:inherit;font-size:.78rem;cursor:pointer;
+       display:flex;flex-direction:column;gap:1px;min-width:82px}
+  .band .lab{letter-spacing:.04em}
+  .band .pc{font-size:15px;font-weight:700;color:var(--line);font-variant-numeric:tabular-nums}
+  .band[aria-pressed="true"]{border-color:var(--amber);background:rgba(255,180,58,.12)}
+  .band:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
 
-  section.chart{background:var(--card);border:1px solid var(--border);border-radius:4px;
-        padding:16px 16px 10px;margin-top:22px}
-  section.chart h2{margin:0 0 2px;font-size:.8rem;letter-spacing:.16em;
-        text-transform:uppercase;color:var(--tag);display:flex;gap:8px;align-items:center}
+  /* ---------- technical tab: radar + axis lists ---------- */
+  /* shot map beside the radar. The radar side carries a 260px axis list too,
+     so it gets the larger share — the pitch itself never exceeds 520px. */
+  /* equal-height columns: both graph wells are GRAPH_H tall, SVGs scale inside */
+  .techduo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+       gap:22px;align-items:stretch}
+  @media(max-width:1280px){.techduo{grid-template-columns:1fr}}
+  .techduo > .box{display:flex;flex-direction:column}
+  .graphwell{height:500px;display:flex;align-items:center;justify-content:center}
+  .graphwell svg{width:100%;height:100%;display:block}
+  .box.techprofile{container-type:inline-size}
+  .profile{display:grid;grid-template-columns:1fr 218px;gap:14px;align-items:start;margin-top:10px}
+  /* the radar now sits in a column, so this switches on the BOX width, not the viewport */
+  @container (max-width:660px){.profile{grid-template-columns:1fr}}
+  .pizzawrap{text-align:center}
+  .pizzawrap .chartbox{margin:0 auto}
+  .pzlegend{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;
+       margin-top:8px;font-size:12px}
+  .pzlegend .i{display:flex;gap:6px;align-items:center;color:var(--muted)}
+  .pzlegend .swatch{border-radius:50%}
+  .cmpbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+  .cmpchip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);
+       border-radius:999px;padding:4px 8px 4px 11px;font-size:.82rem}
+  .cmpchip .swatch{width:9px;height:9px;border-radius:50%}
+  .cmpchip button{border:0;background:rgba(242,245,239,.12);color:var(--line);border-radius:50%;
+       width:17px;height:17px;line-height:1;font-size:11px;cursor:pointer}
+  .cmpsearch{position:relative}
+  #cmpq{width:190px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);
+       background:rgba(242,245,239,.04);color:var(--line);font:inherit;font-size:.82rem}
+  #cmpq:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+  #cmpresults{position:absolute;top:112%;left:0;width:240px;background:var(--card);z-index:7;
+       border:1px solid var(--border);border-radius:6px;overflow:hidden auto;display:none;max-height:260px}
+  #cmpresults button{display:flex;justify-content:space-between;gap:10px;width:100%;padding:7px 12px;
+       border:0;background:none;color:var(--line);font:inherit;font-size:.85rem;text-align:left;cursor:pointer}
+  #cmpresults button:hover{background:rgba(255,180,58,.12)}
+  #cmpresults .sub{color:var(--tag);font-size:.78rem}
+  .axlist.cmp .r{grid-template-columns:1fr repeat(var(--np,2),42px)}
+  .axlist.cmp .r.head b{font-size:10px}
+  .axgroup{margin-bottom:14px}
+  .axgroup h3{margin:0 0 4px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+       display:flex;gap:7px;align-items:center}
+  .axgroup h3 .swatch{border-radius:50%}
+  .axlist{font-size:11.5px}
+  .axlist .r{display:grid;grid-template-columns:minmax(0,1fr) 44px 26px;gap:4px;padding:3px 0;
+       border-top:1px solid rgba(242,245,239,.07)}
+  .axlist .r span:first-child{color:var(--muted)}
+  .axlist .r .raw{text-align:right;color:var(--muted)}
+  .axlist .r b{text-align:right}
 
+  /* ---------- ask tab ---------- */
   .ask-row{display:flex;gap:8px;margin:10px 0 4px}
   .ask-row input{flex:1;padding:9px 14px;border-radius:999px;border:1px solid var(--border);
        background:var(--grass);color:var(--line);font:inherit;font-size:.95rem}
   #ask-model{padding:6px 10px;border-radius:999px;border:1px solid var(--border);
        background:var(--grass);color:var(--muted);font:inherit;font-size:.85rem}
-  #ask-model:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
-  .ask-row input:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+  #ask-model:focus-visible,.ask-row input:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
   .ask-row button{padding:9px 18px;border-radius:999px;border:0;background:var(--amber);
        color:#20160a;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}
   .ask-row button[disabled]{opacity:.5;cursor:default}
-  #ask-out{margin:6px 0 0;font-size:.95rem;color:var(--line);white-space:pre-wrap;min-height:1.4em}
+  #ask-out{margin:6px 0 0;font-size:.95rem;color:var(--line);min-height:1.4em}
   #ask-out.dim{color:var(--muted)}
   #ask-out h3{font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--amber);
-       margin:16px 0 6px;white-space:normal}
+       margin:16px 0 6px}
   #ask-out h3:first-child{margin-top:4px}
-  #ask-out p{margin:0 0 8px;white-space:normal;line-height:1.5}
-  #ask-out ul{margin:0 0 8px;padding-left:18px;white-space:normal;line-height:1.5}
+  #ask-out p{margin:0 0 8px;line-height:1.5}
+  #ask-out ul{margin:0 0 8px;padding-left:18px;line-height:1.5}
   #ask-out li{margin:2px 0}
-  #ask-out table{width:100%;border-collapse:collapse;margin:4px 0 10px;font-size:.85rem;white-space:normal}
+  #ask-out table{width:100%;border-collapse:collapse;margin:4px 0 10px;font-size:.85rem;
+       display:block;overflow-x:auto}
   #ask-out th,#ask-out td{padding:5px 8px;border-bottom:1px solid var(--border);text-align:left}
   #ask-out th{color:var(--muted);font-weight:600;font-size:.75rem;text-transform:uppercase}
   #ask-out td:first-child,#ask-out th:first-child{padding-left:0}
-  #ask-out table{display:block;overflow-x:auto}
   #ask-out strong{color:var(--amber);font-weight:600}
-
-  details.season-log{margin-top:22px;background:var(--card);border:1px solid var(--border);
-       border-radius:4px}
-  details.season-log summary{padding:14px 16px;font-size:.8rem;letter-spacing:.16em;
-       text-transform:uppercase;color:var(--tag);cursor:pointer}
-  details.season-log .scroll{overflow-x:auto}
-  table{border-collapse:collapse;width:100%;font-size:.88rem;min-width:640px}
-  th,td{padding:8px 14px;text-align:right;border-top:1px solid rgba(242,245,239,.08)}
-  th{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--tag);
-     font-weight:600}
-  th:first-child,td:first-child,th:nth-child(2),td:nth-child(2),
-  th:nth-child(3),td:nth-child(3){text-align:left}
-  tbody tr:hover{background:rgba(255,180,58,.06)}
-  .dim{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -176,8 +256,11 @@
 const SUPABASE_URL = "https://rgnzemkdldohplwbxxwy.supabase.co";
 const ANON_KEY = "sb_publishable_Qy0bJ4CdrxffuJGNq12ebw_r0-Z3qD-";
 const AGENT_ENDPOINT = "/api/ask"; // Netlify proxies this to the Render backend
-const MIN_MINUTES = 450;          // pipeline nulls rates below this — same floor here
-const VERDICT_GAP = 15;           // |output pct − value pct| beyond this = not "fair"
+const MIN_MINUTES = 450;      // pipeline nulls rates below this — same floor here
+const VERDICT_GAP = 15;       // |output pct − value pct| beyond this = not "fair"
+const XG_SINCE = 2014;        // Understat coverage starts 2014-15
+const MIN_90S_PEER = 10;      // ~900 minutes before a peer can be ranked (radar pool)
+const MIN_SHOTS_MAP = 20;     // below this a shot map is anecdote, not pattern
 
 async function hub(table, params){
   const q = new URLSearchParams(params);
@@ -186,13 +269,26 @@ async function hub(table, params){
   if(!r.ok) throw new Error(`${table}: ${r.status}`);
   return r.json();
 }
+// Supabase caps every response at 1000 rows regardless of limit
+async function hubAll(table, params){
+  const PAGE = 1000, rows = [];
+  for(let offset = 0;; offset += PAGE){
+    const page = await hub(table, {...params, limit:String(PAGE), offset:String(offset)});
+    rows.push(...page);
+    if(page.length < PAGE) return rows;
+  }
+}
 
 const eur = v => v==null ? "—" :
   v >= 1e6 ? `€${(v/1e6).toFixed(v>=10e6?0:1)}M` : `€${Math.round(v/1e3)}k`;
 const esc = s => String(s).replace(/[&<>"']/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const tipEl = () => document.getElementById("tip");
+const showTip = (e, html) => { const t=tipEl(); t.innerHTML=html; t.style.display="block";
+  t.style.left=Math.min(e.clientX+14, innerWidth-244)+"px"; t.style.top=(e.clientY+14)+"px"; };
+const hideTip = () => tipEl().style.display="none";
 
-/* ---------- search ---------- */
+/* ---------- search (player.html contract — every season, not just 2014+) ---------- */
 const box = document.getElementById("search");
 const list = document.getElementById("results");
 let deb;
@@ -207,11 +303,11 @@ document.addEventListener("click", e => {
 });
 
 async function runSearch(q){
-  const rows = await hub("player_season", {
+  const found = await hub("player_season", {
     select: "player_name,tm_id,team,season,league",
     player_name: `ilike.*${q}*`, order: "season.desc", limit: "60"});
   const seen = new Set(); const picks = [];
-  for(const r of rows){
+  for(const r of found){
     const key = r.tm_id ?? `name:${r.player_name}`;
     if(seen.has(key)) continue;
     seen.add(key); picks.push(r);
@@ -226,8 +322,14 @@ async function runSearch(q){
     b.onclick = () => {
       list.style.display = "none"; box.value = "";
       const u = new URL(location);
-      u.search = p.tm_id != null ? `?tm=${p.tm_id}`
-               : `?name=${encodeURIComponent(p.player_name)}`;
+      // keep the lens you arrived on (index links straight to ?tab=technical);
+      // the season and any comparison belong to the player you just left
+      const tab = qs().get("tab");
+      const q2 = new URLSearchParams();
+      if(p.tm_id != null) q2.set("tm", p.tm_id);
+      else q2.set("name", p.player_name);
+      if(TABS.includes(tab)) q2.set("tab", tab);
+      u.search = "?" + q2.toString();
       history.pushState({}, "", u);
       load();
     };
@@ -236,68 +338,154 @@ async function runSearch(q){
   list.style.display = "block";
 }
 
-/* ---------- page load ---------- */
+/* ---------- page state ----------
+   URL is the single source of truth: ?tm= | ?name= identify the player,
+   ?s= the season ("career" or a season label), ?tab= the open lens,
+   ?vs= the radar's comparison players.                                   */
+const TABS = ["technical", "value", "ask"];
+let rows = [], seasons = [], peers = [];
+let hasTechnical = false, defaultTab = "value";
+
+const qs = () => new URLSearchParams(location.search);
+const mainTm = () => qs().get("tm");
+const sel = () => {                       // selected season, or "career"
+  const s = qs().get("s");
+  return seasons.includes(s) ? s : "career";   // career is the default view
+};
+const tabSel = () => {
+  const t = qs().get("tab");
+  return TABS.includes(t) ? t : defaultTab;   // explicit ?tab= always wins
+};
+const vsList = () => (qs().get("vs") || "").split(",").filter(Boolean).slice(0, 3);
+
+// the season every value-scoped block uses. "career" has no peer pool
+// (percentiles are per season+league+position), so it pins to the latest
+// season with enough minutes and the caption says so.
+function pinnedSeason(){
+  return [...rows].reverse().find(r => (r.minutes||0) >= MIN_MINUTES)?.season
+       ?? seasons[seasons.length-1];
+}
+
+function pushUrl({s, tab, vs} = {}){
+  const p = new URLSearchParams();
+  const u0 = qs();
+  if(u0.has("tm")) p.set("tm", u0.get("tm"));
+  else if(u0.has("name")) p.set("name", u0.get("name"));
+  const season = s !== undefined ? s : (u0.get("s") ?? "");
+  if(season && season !== "career") p.set("s", season);   // career is the default, keep it out of the URL
+  const t = tab !== undefined ? tab : tabSel();
+  if(t) p.set("tab", t);
+  const v = vs !== undefined ? vs : vsList();
+  if(v.length) p.set("vs", v.join(","));
+  const u = new URL(location);
+  u.search = "?" + p.toString();
+  history.pushState({}, "", u);
+}
+
+/* ---------- load ---------- */
 window.addEventListener("popstate", load);
 load();
 
 async function load(){
-  const u = new URLSearchParams(location.search);
+  const u = qs();
   const main = document.getElementById("main");
   if(!u.has("tm") && !u.has("name")) return;
   main.innerHTML = `<div class="empty">Loading…</div>`;
+
   const params = {select: "*", order: "season"};
   if(u.has("tm")) params.tm_id = `eq.${u.get("tm")}`;
   else params.player_name = `eq.${u.get("name")}`;
-  let rows, moves = [];
+
   try{
     rows = await hub("player_season", params);
-    if(u.has("tm"))
-      moves = await hub("transfers",
-        {select:"transfer_date,from_club_name,to_club_name,transfer_fee,market_value_in_eur",
-         tm_id:`eq.${u.get("tm")}`, order:"transfer_date"});
+  }catch(e){
+    main.innerHTML =
+      `<div class="empty">Could not reach the database (${esc(e.message)}). Try again.</div>`;
+    return;
   }
-  catch(e){ main.innerHTML =
-    `<div class="empty">Could not reach the database (${esc(e.message)}). Try again.</div>`;
-    return; }
-  if(!rows.length){ main.innerHTML =
-    `<div class="empty">No seasons found for this player.</div>`; return; }
+  if(!rows.length){
+    main.innerHTML = `<div class="empty">No seasons found for this player.</div>`;
+    return;
+  }
+  // safe here and not at the top of load(): this lives in the tab modules
+  // further down the file, so it only exists once the script has evaluated.
+  resetCaches();
 
-  // card season: ?s= override, else latest with enough minutes, else latest
-  const seasons = [...new Set(rows.map(r=>r.season))].sort();
-  let season = u.get("s");
-  if(!seasons.includes(season)){
-    season = [...rows].reverse().find(r=>(r.minutes||0) >= MIN_MINUTES)?.season
-           ?? seasons[seasons.length-1];
-  }
-  // a mid-season mover has two rows; the card rates the bigger stint
-  const srow = rows.filter(r=>r.season===season)
-                   .sort((a,b)=>(b.minutes||0)-(a.minutes||0))[0];
+  seasons = [...new Set(rows.map(r => r.season))].sort();
+  // Technical needs BOTH an Understat-era season and a matched Understat id.
+  // Missing either, the page opens on Value — Technical stays reachable and
+  // renders its coverage note instead of the old whole-page abort.
+  hasTechnical = rows.some(r => +r.season >= XG_SINCE)
+              && rows.some(r => r.understat_id != null);
+  defaultTab = hasTechnical ? "technical" : "value";
 
-  let peers = [], curve = [];
-  if(srow.primary_position){
-    // independent fetches: losing the curve must not cost the card its percentiles
-    const [pr, cr] = await Promise.allSettled([
-      hub("player_season", {
-        select: "player_name,team,minutes,starts,matches_played,nineties," +
-                "non_penalty_goals_assists_per90,market_value_in_eur," +
-                "tackles_interceptions_per90,save_pct,clean_sheet_pct,goals_against," +
-                "np_xg,xa",
-        league: `eq.${srow.league}`, season: `eq.${season}`,
-        primary_position: `eq.${srow.primary_position}`, minutes: `gte.${MIN_MINUTES}`}),
-      hub("age_curve", {select: "age,avg_value_eur",
-        primary_position: `eq.${srow.primary_position}`, order: "age"}),
-    ]);
-    if(pr.status === "fulfilled") peers = pr.value;
-    if(cr.status === "fulfilled") curve = cr.value;
-  }
-  render(rows, moves, srow, peers, seasons, curve);
+  render();
 }
 
-/* transfer date -> season start-year label ('2022-07-01' -> '2022') */
-const moveSeason = d => {
-  const [y,m] = d.split("-").map(Number);
-  return String(m >= 7 ? y : y-1);
-};
+/* Season peer pool behind the Value tab's bars and scatter. Not fetched on
+   page load — the hero strip is career-only and needs none of it — and keyed
+   so revisiting the tab on the same season doesn't refetch.               */
+let peersKey = null;
+async function loadPeers(){
+  const srow = seasonRow();
+  if(!srow?.primary_position){ peers = []; peersKey = null; return; }
+  const key = `${srow.league}|${srow.primary_position}|${srow.season}`;
+  if(key === peersKey) return;
+  peers = []; peersKey = key;
+  // losing the pool must not cost the tab its render — the verdict degrades
+  // to "no market data" on its own
+  try{
+    peers = await hub("player_season", {
+      select: "player_name,team,minutes,starts,matches_played,nineties," +
+              "non_penalty_goals_assists_per90,market_value_in_eur," +
+              "tackles_interceptions_per90,save_pct,clean_sheet_pct,goals_against," +
+              "np_xg,xa",
+      league: `eq.${srow.league}`, season: `eq.${srow.season}`,
+      primary_position: `eq.${srow.primary_position}`, minutes: `gte.${MIN_MINUTES}`});
+  }catch(e){ /* peers stays [] */ }
+}
+
+// a mid-season mover has two rows; the value blocks rate the bigger stint
+function seasonRow(){
+  const s = sel() === "career" ? pinnedSeason() : sel();
+  return rows.filter(r => r.season === s)
+             .sort((a,b) => (b.minutes||0) - (a.minutes||0))[0];
+}
+
+/* ---------- career totals ----------
+   The hero strip NEVER follows the season chips — it is the whole career,
+   every season the hub has, Understat-era or not. Rates divide by the
+   nineties of the rows that actually carry the stat, so a pre-2014 season
+   with no xG doesn't drag an xG rate down.                                */
+function careerModel(){
+  const sum = k => rows.reduce((a,r) => a + (r[k] ?? 0), 0);
+  const has = k => rows.some(r => r[k] != null);
+  const n90Of = k => rows.reduce((a,r) => a + (r[k] != null ? (r.nineties ?? 0) : 0), 0);
+  const last = rows[rows.length-1];
+
+  const n90 = n90Of("non_penalty_goals");
+  const npGA90 = n90 ? (sum("non_penalty_goals") + sum("assists")) / n90 : null;
+  const overP = has("np_xg") ? sum("non_penalty_goals") - sum("np_xg") : null;
+
+  return {
+    last,
+    span: seasons.length > 1 ? `${seasons[0]}–${seasons[seasons.length-1]}` : seasons[0],
+    minutes: sum("minutes"),
+    goals: sum("goals"), assists: sum("assists"),
+    saves: has("saves") ? sum("saves") : null,
+    cleanSheets: has("clean_sheets") ? sum("clean_sheets") : null,
+    peakVal: rows.reduce((a,r) => Math.max(a, r.market_value_in_eur||0), 0) || null,
+    npGA90, overP,
+    seasons: seasons.length,
+    clubs: new Set(rows.map(r => r.team)).size,
+    // the shot-derived half of the game line needs shots_understat; these come
+    // straight off player_season so the line can paint before shots land
+    shots: has("shots") ? sum("shots") : null,
+    npxg: has("np_xg") ? sum("np_xg") : null,
+    tackles: has("tackles_won") ? sum("tackles_won") : null,
+    intc: has("interceptions") ? sum("interceptions") : null,
+  };
+}
 
 /* ---------- percentiles ---------- */
 // pct(v) = share of pool strictly below v; pool = peers with the stat present
@@ -320,9 +508,6 @@ const conceded90 = r => r.nineties && r.goals_against!=null ? r.goals_against/r.
 // expected output per 90 — the process behind npG+A/90 (Understat, 2014+)
 const npxga90 = r => r.nineties && r.np_xg!=null
   ? (r.np_xg + (r.xa ?? 0)) / r.nineties : null;
-// league seasons: 34 games in the Bundesliga, 38 everywhere else in the big five
-const availability = r => Math.min(1, (r.minutes||0) /
-  ((r.league?.startsWith("GER") ? 34 : 38) * 90));
 
 // position-appropriate output metric drives the rating, verdict and scatter
 const METRIC = {
@@ -338,9 +523,9 @@ const METRIC = {
        note:"Save% ignores shot difficulty — PSxG arrives with a later phase."},
 };
 
-function cardModel(srow, peers){
+function cardModel(srow, pool0){
   const metric = METRIC[srow.primary_position] ?? METRIC.FW;
-  const pool = peers.map(p=>({...p, start_share: startShare(p),
+  const pool = pool0.map(p=>({...p, start_share: startShare(p),
     conceded90: conceded90(p), npxga90: npxga90(p)}));
   const me = {...srow, start_share: startShare(srow), conceded90: conceded90(srow),
     npxga90: npxga90(srow)};
@@ -374,25 +559,292 @@ function cardModel(srow, peers){
   return {pct, verdict, pool, me, metric, overP};
 }
 
-/* ---------- render ---------- */
-function render(rows, moves, srow, peers, seasons, curve = []){
-  const typical = Object.fromEntries(curve.map(c=>[c.age, c.avg_value_eur]));
-  const last = rows[rows.length-1];
-  const sum = k => rows.reduce((a,r)=>a+(r[k]||0),0);
-  const peakVal = rows.reduce((a,r)=>Math.max(a,r.market_value_in_eur||0),0);
-  const clubs = new Set(rows.map(r=>r.team)).size;
+/* ---------- per-90 rates (technical scope) ----------
+   Each rate divides by the minutes of the rows that actually carry the stat:
+   a season with no Understat match has null xG but real minutes, and counting
+   those minutes would silently understate every xG rate for that career.   */
+function rates(rs){
+  const n90All = rs.reduce((a,r)=>a+(r.nineties ?? 0), 0);
+  if(!n90All) return null;
+  const per90 = k => {
+    let num = 0, den = 0;
+    for(const r of rs) if(r[k]!=null){ num += r[k]; den += r.nineties ?? 0; }
+    return den ? num/den : null;
+  };
+  const sum = k => rs.reduce((a,r)=>a+(r[k] ?? 0), 0);
+  const shots = sum("shots"), npxg = sum("np_xg");
+  const cards = rs.some(r=>r.yellow_cards!=null)
+    ? per90("yellow_cards")+(per90("red_cards") ?? 0) : null;
+  return {
+    n90: n90All,
+    npxg90:  per90("np_xg"),
+    sh90:    per90("shots"),
+    xgsh:    shots ? npxg/shots : null,
+    npg90:   per90("non_penalty_goals"),
+    xa90:    per90("xa"),
+    kp90:    per90("key_passes"),
+    chain90: per90("xg_chain"),
+    build90: per90("xg_buildup"),
+    tkl90:   per90("tackles_won"),
+    int90:   per90("interceptions"),
+    foul90:  per90("fouls_committed"),
+    card90:  cards,
+  };
+}
+
+// best season by npG+A/90 among seasons with >=10 nineties, else by G+A total
+function bestSeason(){
+  const bySeason = new Map();
+  for(const r of rows){
+    if(+r.season < XG_SINCE) continue;      // the chip is a technical-scope shortcut
+    if(!bySeason.has(r.season)) bySeason.set(r.season, []);
+    bySeason.get(r.season).push(r);
+  }
+  let best=null, bestScore=-1;
+  for(const [ss, rs] of bySeason){
+    const q = rates(rs);
+    const score = (q && q.n90>=10 && q.npg90!=null)
+      ? q.npg90 + (q.xa90 ?? 0)             // output rate when the sample holds
+      : -1 + rs.reduce((a,r)=>a+(r.goals||0)+(r.assists||0),0)/1000;  // else raw tally
+    if(score > bestScore){ bestScore=score; best=ss; }
+  }
+  return best;
+}
+
+// One justified line in the hero strip, replacing the old Game profile box.
+// The player_season half paints immediately; the shot-derived half fills in
+// once shots_understat lands. Career scope always — the strip ignores chips.
+function gameLine(c, allShots){
+  const item = (label, val) => `<span><i>${label}</i>${val}</span>`;
+  const out = [
+    item("Shots", c.shots ?? "—"),
+    item("Goals", c.goals),
+    item("npxG", c.npxg!=null ? c.npxg.toFixed(1) : "—"),
+    item("Tackles won", c.tackles ?? "—"),
+    item("Interceptions", c.intc ?? "—"),
+  ];
+  if(allShots?.length){
+    const np = allShots.filter(r => r.situation != null);   // non-penalty
+    const onT = allShots.filter(r => ["Goal","Saved Shot"].includes(r.result)).length;
+    const dCount = {};
+    let modeD = null, modeN = -1;
+    for(const r of np){ const d = Math.round(DIST(r)); dCount[d] = (dCount[d]||0)+1;
+      if(dCount[d] > modeN){ modeN = dCount[d]; modeD = d; } }
+    const pct = n => np.length ? Math.round(100*n/np.length)+"%" : "—";
+    const foot = k => np.filter(r => r.body_part === k).length;
+    out.push(
+      item("Mode dist", modeD!=null ? modeD+"m" : "—"),
+      item("Left", pct(foot("Left Foot"))),
+      item("Right", pct(foot("Right Foot"))),
+      item("Head", pct(foot("Head"))),
+      item("On target", allShots.length ? Math.round(100*onT/allShots.length)+"%" : "—"),
+      item("In box", pct(np.filter(IN_BOX).length)),
+    );
+  }
+  return out.join("");
+}
+
+/* ---------- shell: hero strip + chips + tabs ---------- */
+function render(){
+  const c = careerModel();
+  const last = c.last;
   document.title = `${last.player_name} — SoccerHub`;
+
+  const s = sel(), best = bestSeason();
+  const chip = (val, label, pressed) =>
+    `<button data-s="${esc(val)}" aria-pressed="${pressed}">${label}</button>`;
+  const chips = [
+    chip("career", "Career", s === "career"),
+    best ? chip(best, `Best year · ${esc(best)}`, s === best) : "",
+    ...seasons.map(x => chip(x, esc(x), s === x)),
+  ].join("");
+
+  const tabBtn = (id, label) =>
+    `<button role="tab" data-tab="${id}" aria-selected="${tabSel() === id}"
+       aria-controls="tabbody">${label}</button>`;
+
+  const isGK = last.primary_position === "GK";
+
+  document.getElementById("main").innerHTML = `
+  <div class="herostrip">
+    <div class="idbox">
+      <h1 class="disp">${esc(last.player_name)}</h1>
+      <p>${esc(last.primary_position ?? "")} · ${esc(last.team)} · ${esc(last.league.split("-")[1] ?? last.league)}
+         · ${esc(c.span)} · ${esc(last.nationality ?? "")}${last.age!=null ? " · age "+last.age : ""}</p>
+    </div>
+    <div class="facts nums">
+      <div><label>Minutes</label><b>${c.minutes.toLocaleString("en")}</b></div>
+      <div><label>${isGK ? "Saves · CS" : "G + A"}</label>
+        <b>${isGK ? `${c.saves ?? "—"} · ${c.cleanSheets ?? "—"}`
+                  : `${c.goals} + ${c.assists}`}</b></div>
+      <div><label>Peak value</label><b>${eur(c.peakVal)}</b></div>
+      <div><label>npG+A /90</label><b>${c.npGA90!=null ? c.npGA90.toFixed(2) : "—"}</b></div>
+      <div><label>npG − npxG</label><b>${c.overP!=null
+        ? `<span style="color:${c.overP>0?"var(--green)":c.overP<0?"var(--red)":"inherit"}">${
+            c.overP>0?"+":""}${c.overP.toFixed(1)}</span>` : "—"}</b></div>
+      <div><label>Seasons</label><b>${c.seasons}</b></div>
+      <div><label>Clubs</label><b>${c.clubs}</b></div>
+    </div>
+    <p class="gameline nums" id="gameline">${gameLine(c, null)}</p>
+  </div>
+
+  <div class="chips nums" id="chips">${chips}</div>
+
+  <div class="tabs" role="tablist">
+    ${tabBtn("technical", "Technical")}
+    ${tabBtn("value", "Value")}
+    ${tabBtn("ask", "Ask")}
+  </div>
+  <div id="tabbody" role="tabpanel"></div>`;
+
+  document.getElementById("chips").addEventListener("click", e => {
+    const v = e.target.dataset?.s;
+    if(!v) return;
+    pushUrl({s: v});
+    reloadForSeason();
+  });
+  document.querySelector(".tabs").addEventListener("click", e => {
+    const t = e.target.closest("[data-tab]")?.dataset.tab;
+    if(!t || t === tabSel()) return;
+    pushUrl({tab: t});
+    render();            // re-renders the strip too: aria-selected lives there
+  });
+
+  renderTab();
+}
+
+// the xG band filter belonged to the season you just left
+function reloadForSeason(){
+  selectedBands.clear();
+  render();
+}
+
+/* ---------- tab bodies (stages 2–4) ---------- */
+function renderTab(){
+  const body = document.getElementById("tabbody");
+  const tab = tabSel();
+  if(tab === "technical") return renderTechnical(body);
+  if(tab === "value")     return renderValue(body);
+  return renderAsk(body);
+}
+
+async function renderTechnical(body){
+  const note = msg => body.innerHTML = `<div class="box"><p class="cap">${msg}</p></div>`;
+  if(!hasTechnical)
+    return note(`Shot-level xG data begins ${XG_SINCE}–15, and this player has no matched
+      Understat record. Every season still appears as totals on the Value tab.`);
+
+  const s = sel();
+  if(s !== "career" && +s < XG_SINCE)
+    return note(`Shot-level xG data begins ${XG_SINCE}–15, so ${esc(s)} has no shots,
+      rates or percentiles. Pick a later season or Career — ${esc(s)} still appears as
+      totals on the Value tab.`);
+
+  body.innerHTML = `
+  <div class="techduo">
+  <div class="box">
+    <h2>Shot map
+      <span class="plain">· <span class="swatch" style="background:var(--amber);border-radius:50%"></span> goal
+      · <span class="swatch" style="background:rgba(242,245,239,.35);border-radius:50%"></span> no goal
+      · dot size = xG · click a band to filter</span></h2>
+    <div class="bandchips" id="bandchips"></div>
+    <div class="chartbox graphwell"><div id="pitch" style="width:100%;height:100%"></div></div>
+    <p class="cap" id="pitchcap"></p>
+  </div>
+
+  <div class="box techprofile">
+    <h2>Technical profile <span class="plain">· percentile vs positional peers</span></h2>
+    <div class="cmpbar">
+      <span id="cmpchips"></span>
+      <span class="cmpsearch" ${vsList().length >= MAX_VS ? "hidden" : ""}>
+        <input id="cmpq" type="search" placeholder="+ compare player…" autocomplete="off">
+        <div id="cmpresults"></div>
+      </span>
+    </div>
+    <div class="profile">
+      <div class="pizzawrap">
+        <div class="chartbox graphwell" id="pizza"><p class="cap">Ranking…</p></div>
+        <div class="pzlegend" id="pzlegend"></div>
+      </div>
+      <div id="axlists"></div>
+    </div>
+  </div>
+  </div>`;
+
+  wireCompare();
+  await loadShots();
+  const shotRows = s === "career" ? shots : shots.filter(r => r.season === s);
+
+  // the strip's game line is career-scoped and painted before shots arrived
+  const gl = document.getElementById("gameline");
+  if(gl) gl.innerHTML = gameLine(careerModel(), shots);
+
+  drawBands(shotRows);          // band chips + first paint of the map
+  document.getElementById("bandchips").addEventListener("click", e => {
+    const b = e.target.closest("[data-band]");
+    if(!b) return;
+    const id = b.dataset.band;
+    selectedBands.has(id) ? selectedBands.delete(id) : selectedBands.add(id);
+    drawBands(shotRows);
+  });
+  await drawRadars(s);
+}
+
+/* ====================================================================
+   Value tab — price against output. Two scopes in one tab: the bars and
+   the scatter rank ONE season against that season's positional pool, the
+   charts and logs below are the whole career. Both fetch on first open.
+   ==================================================================== */
+
+let moves = [], curve = [];
+
+// A tab's data is fetched once per player: the first call starts it, later
+// calls get the same promise, and .reset() drops it when the player changes.
+const once = fn => { const f = () => f._p ??= fn(); f.reset = () => f._p = null; return f; };
+
+// every per-player cache, cleared together when load() picks up a new player
+function resetCaches(){
+  moves = []; curve = []; shots = [];
+  peers = []; peersKey = null;
+  loadMoves.reset(); loadCurve.reset(); loadShots.reset();
+  selectedBands.clear();
+  peerCache.clear(); careerCache.clear();
+}
+
+const loadMoves = once(async () => {
+  const tm = mainTm();
+  if(!tm) return moves = [];
+  // coverage is patchy upstream; the chart's dotted lines say so
+  try{ return moves = await hub("transfers",
+    {select:"transfer_date,from_club_name,to_club_name,transfer_fee,market_value_in_eur",
+     tm_id:`eq.${tm}`, order:"transfer_date"}); }
+  catch{ return moves = []; }
+});
+
+const loadCurve = once(async () => {
+  const pos = rows[rows.length-1]?.primary_position;
+  if(!pos) return curve = [];
+  // losing the curve must not cost the other line its chart
+  try{ return curve = await hub("age_curve",
+    {select:"age,avg_value_eur", primary_position:`eq.${pos}`, order:"age"}); }
+  catch{ return curve = []; }
+});
+
+async function renderValue(body){
+  body.innerHTML = `<div class="box"><p class="cap">Ranking…</p></div>`;
+  await Promise.all([loadPeers(), loadMoves(), loadCurve()]);
+
+  const srow = seasonRow();
   const m = cardModel(srow, peers);
+  const typical = Object.fromEntries(curve.map(c => [c.age, c.avg_value_eur]));
+  const peakVal = careerModel().peakVal;
 
-  const chips = seasons.map(s=>
-    `<button data-s="${esc(s)}" aria-pressed="${s===srow.season}">${esc(s)}</button>`).join("");
-
-  const bar = (label,p,color,raw) => `
+  const bar = (label, p, color, raw) => `
     <div class="bar"><label>${label}</label>
       <div class="track"><div class="fill" style="width:${p??0}%;background:${color}"></div></div>
       <b class="nums"><span class="raw">${raw ?? ""}</span>${p??"—"}</b></div>`;
 
-  // literal booking cards: one dot per card, actual card colors (icon array —
+  // literal booking cards: one dot per card, actual card colours (icon array —
   // counts this small read better as objects than as a percentile)
   const cardDots = r => {
     const y = r.yellow_cards ?? 0, red = r.red_cards ?? 0, mins = r.minutes || 0;
@@ -408,151 +860,93 @@ function render(rows, moves, srow, peers, seasons, curve = []){
       </div></div>`;
   };
 
-  const pens = (srow.penalties_attempted||0)
-    ? `${srow.penalties_scored||0}/${srow.penalties_attempted}` : "—";
-  const staleWarn = srow.value_is_stale
-    ? ' <span class="warn" title="valuation more than a year old at season end">⚠</span>' : "";
+  const isGK = srow.primary_position === "GK";
 
-  document.getElementById("main").innerHTML = `
-  <div class="chips nums" id="chips">${chips}</div>
-  <div class="duo">
-    <div class="pcard">
-      <div class="head">
-        <div class="rating"><b class="nums">${m.pct[m.metric.key] ?? "—"}</b>
-          <span>OUTPUT<br>PCT</span></div>
-        <div class="idbox">
-          <h1 class="disp">${esc(srow.player_name)}</h1>
-          <p>${esc(srow.primary_position ?? "")} · ${esc(srow.team)} · ${esc(srow.league.split("-")[1] ?? srow.league)}
-             · ${esc(srow.season)} · ${esc(srow.nationality ?? "")}${srow.age!=null ? " · age "+srow.age : ""}</p>
-        </div>
-      </div>
-      <div class="verdict">
-        <span class="chip" style="background:${m.verdict.color}">${m.verdict.chip}</span>
-        <small>${m.verdict.gap!=null
-          ? `output ${m.pct[m.metric.key]} pct vs value ${m.pct.market_value_in_eur} pct · gap ${m.verdict.gap>0?"+":""}${m.verdict.gap}`
-          : ""}</small>
-      </div>
-      ${bar(m.metric.label, m.pct[m.metric.key], "var(--green)",
-            m.metric.fmt(srow[m.metric.key]))}
+  body.innerHTML = `
+  <p class="scopelabel">${esc(srow.season)} season
+    <span>· ranked against ${m.pool.length} ${esc(srow.primary_position ?? "")} in the
+    ${esc(srow.league.split("-")[1] ?? srow.league)}, ≥${MIN_MINUTES} min${
+      sel() === "career" ? ` — pinned here because "Career" has no single-season peer pool` : ""}</span></p>
+
+  <div class="valueduo">
+    <div class="box">
+      <h2>Price vs output
+        <span class="plain">· <span class="chip" style="background:${m.verdict.color};padding:2px 10px;font-size:11px">${m.verdict.chip}</span>
+        ${m.verdict.gap!=null
+          ? `output ${m.pct[m.metric.key]} vs value ${m.pct.market_value_in_eur} · gap ${m.verdict.gap>0?"+":""}${m.verdict.gap}`
+          : ""}</span></h2>
+      ${bar(m.metric.label, m.pct[m.metric.key], "var(--green)", m.metric.fmt(srow[m.metric.key]))}
       ${m.pct.npxga90!=null ? bar("npxG+xA /90", m.pct.npxga90, "var(--chalk-y)",
             m.me.npxga90.toFixed(2)) : ""}
-      ${srow.primary_position === "GK" ? `
+      ${isGK ? `
       ${bar("Clean sheet %", m.pct.clean_sheet_pct, "var(--green)",
             srow.clean_sheet_pct!=null ? srow.clean_sheet_pct.toFixed(1)+"%" : null)}
       ${bar("Conceded /90", m.pct.conceded, "var(--green)",
             m.me.conceded90!=null ? m.me.conceded90.toFixed(2) : null)}` : ""}
       ${bar("Availability", m.pct.minutes, "var(--blue)",
             Math.round(availability(srow)*100)+"%")}
-      ${srow.primary_position === "GK" ? "" /* keepers never sub — share is always ~100% */ :
+      ${isGK ? "" /* keepers never sub — share is always ~100% */ :
         bar("Start share", m.pct.start_share, "var(--blue)",
             m.me.start_share!=null ? Math.round(m.me.start_share*100)+"%" : null)}
       ${cardDots(srow)}
       ${bar("Value €", m.pct.market_value_in_eur, "var(--amber)", eur(srow.market_value_in_eur))}
-      <div class="facts nums">
-        <div><label>Minutes</label><b>${(srow.minutes??0).toLocaleString("en")}</b></div>
-        <div><label>${srow.primary_position==="GK" ? "Saves · CS" : "G + A"}</label>
-          <b>${srow.primary_position==="GK"
-            ? `${srow.saves??"—"} · ${srow.clean_sheets??"—"}`
-            : `${srow.goals??0} + ${srow.assists??0}`}</b></div>
-        <div><label>Value</label><b>${eur(srow.market_value_in_eur)}${staleWarn}</b></div>
-        <div><label>${esc(m.metric.label)}</label><b>${m.metric.fmt(srow[m.metric.key]) ?? "—"}</b></div>
-        <div><label>npG − npxG</label><b>${m.overP!=null
-          ? `<span style="color:${m.overP>0?"var(--green)":m.overP<0?"var(--red)":"inherit"}">${
-              m.overP>0?"+":""}${m.overP.toFixed(1)}</span>` : "—"}</b></div>
-        <div><label>Peers</label><b>${m.pool.length} ${esc(srow.primary_position ?? "")}</b></div>
-      </div>
-      <div class="facts nums">
-        <div><label>Seasons</label><b>${seasons.length}</b></div>
-        <div><label>Clubs</label><b>${clubs}</b></div>
-        <div><label>Career G+A</label><b>${sum("goals")+sum("assists")}</b></div>
-      </div>
-      ${m.verdict.note ? `<p class="cardnote">${m.verdict.note}</p>` : ""}
-      ${m.verdict.ceiling ? `<p class="cardnote">${m.verdict.ceiling}</p>` : ""}
-      <p class="cardnote">Percentiles vs same position, league and season, ≥${MIN_MINUTES} min. Peak value ${eur(peakVal||null)}.</p>
+      ${m.verdict.note ? `<p class="cap">${m.verdict.note}</p>` : ""}
+      ${m.verdict.ceiling ? `<p class="cap">${m.verdict.ceiling}</p>` : ""}
+      <p class="cap">Peak career value ${eur(peakVal)}.</p>
     </div>
 
-    <div class="panel">
-      <div class="box">
-        <h2>Value vs output — ${esc(srow.season)} ${esc(srow.league.split("-")[0])} ${esc(srow.primary_position ?? "")}
-          <span class="plain">· hover any dot</span></h2>
-        <div class="chartbox">${scatter(m)}</div>
-        <p class="cap">Dashed diagonal = parity: production matches price. Above it = bargain zone,
-           below = premium zone. Amber dot = ${esc(srow.player_name)}.</p>
-      </div>
-      <div class="box">
-        <h2>${trendLines(m, typical).map(([,c,lab])=>
-            `<span class="swatch" style="background:${c}"></span>${esc(lab)}`).join(" ")}
-          <span class="plain">· career trend, hover for values</span></h2>
-        <div class="chartbox">${trendChart(rows, trendLines(m, typical))}</div>
-        <p class="cap">Typical value = same-position average at that age. Lines are shape-fitted
-           to their own scale (different units) — real values in the tooltip.</p>
-      </div>
-      ${rows.some(r=>r.np_xg!=null) ? `
-      <div class="box">
-        <h2><span class="swatch" style="background:var(--green)"></span>npGoals
-          <span class="swatch" style="background:var(--chalk-y)"></span>npxG
-          <span class="plain">· finishing vs chance quality</span></h2>
-        <div class="chartbox">${xgChart(rows)}</div>
-        <p class="cap">Bars = non-penalty goals, line = the xG those chances were worth.
-           Above the line is overperformance — real finishing skill takes several
-           seasons to separate from luck, so read the run, not one bar.
-           ${rows.some(r=>r.np_xg==null && +r.season >= 2014)
-             ? "Seasons without a bar had no Understat match." : ""}</p>
-      </div>` : ""}
+    <div class="box">
+      <h2>Value vs output — ${esc(srow.season)} ${esc(srow.league.split("-")[0])} ${esc(srow.primary_position ?? "")}
+        <span class="plain">· hover any dot</span></h2>
+      <div class="chartbox">${scatter(m)}</div>
+      <p class="cap">Real euros, log scale, against the raw rate. Dashed lines are the peer
+         medians: top-left is cheap and productive, bottom-right expensive and quiet.
+         Amber dot = ${esc(srow.player_name)}.</p>
     </div>
   </div>
 
-  <section class="chart">
-    <h2><span class="swatch" style="background:var(--amber)"></span>Market value by season
-      <span style="color:var(--muted);letter-spacing:0;text-transform:none">· dashed = transfer · dotted = club change</span></h2>
-    <div class="chartbox">${valueChart(rows, moves)}</div>
-  </section>
+  <p class="scopelabel">Career <span>· every season, whatever the chips say</span></p>
 
-  <section class="chart">
-    <h2><span class="swatch" style="background:var(--blue)"></span>Ask the analyst
-      <span style="color:var(--muted);letter-spacing:0;text-transform:none">· AI over the hub data</span></h2>
-    <div class="ask-row">
-      <select id="ask-model">
-        <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
-        <option value="gemini-3.6-flash" selected>Gemini 3.6 Flash</option>
-        <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
-        <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
-      </select>
-    </div>
-    <div class="ask-row">
-      <input id="ask-q" type="text" autocomplete="off"
-        placeholder="e.g. How does this player compare to his positional peers?">
-      <button id="ask-go" type="button">Ask</button>
-    </div>
-    <div id="ask-out" class="dim">Answers use live hub data via the agent. Free-text — one question at a time.</div>
-  </section>
-  ${moves.length ? `
-  <details class="season-log">
-    <summary>Transfers (source coverage is partial — big historic moves can be missing)</summary>
-    <div class="scroll">
-    <table class="nums">
-      <thead><tr><th>Date</th><th>From</th><th>To</th><th>Fee</th><th>Value then</th></tr></thead>
-      <tbody>
-      ${moves.slice().reverse().map(t=>`
-        <tr>
-          <td>${esc(t.transfer_date)}</td>
-          <td>${esc(t.from_club_name ?? "—")}</td>
-          <td>${esc(t.to_club_name ?? "—")}</td>
-          <td>${t.transfer_fee ? eur(t.transfer_fee) : '<span class="dim">free / undisclosed</span>'}</td>
-          <td>${eur(t.market_value_in_eur)}</td>
-        </tr>`).join("")}
-      </tbody>
-    </table>
-    </div>
-  </details>` : ""}
+  <div class="box">
+    <h2><span class="swatch" style="background:var(--blue)"></span>Minutes by season
+      <span class="plain">· availability, hover for values</span></h2>
+    <div class="chartbox">${minutesChart(rows)}</div>
+    <p class="cap">Real minutes against a full league season (${FULL_SEASON.toLocaleString("en")},
+       or 3,060 in the Bundesliga). Dips are injury, rotation or a mid-season move —
+       the season log says which.</p>
+  </div>
+
+  ${rows.some(r => r.np_xg != null) ? `
+  <div class="box">
+    <h2><span class="swatch" style="background:var(--green)"></span>npGoals
+      <span class="swatch" style="background:var(--chalk-y)"></span>npxG
+      <span class="plain">· finishing vs chance quality</span></h2>
+    <div class="chartbox">${xgChart(rows)}</div>
+    <p class="cap">Bars = non-penalty goals, line = the xG those chances were worth.
+       Above the line is overperformance — real finishing skill takes several
+       seasons to separate from luck, so read the run, not one bar.
+       ${rows.some(r => r.np_xg==null && +r.season >= XG_SINCE)
+         ? "Seasons without a bar had no Understat match." : ""}</p>
+  </div>` : ""}
+
+  <div class="box">
+    <h2><span class="swatch" style="background:var(--amber)"></span>Market value
+      <span class="swatch" style="background:var(--chalk-y)"></span>Typical for age
+      <span class="plain">· vertical dashed = transfer · dotted = club change</span></h2>
+    <div class="chartbox">${valueChart(rows, moves, typical)}</div>
+    <p class="cap">Both lines are euros on the same axis, so the gap is the real one:
+       above the dashed line he is priced over a typical ${esc(srow.primary_position ?? "")}
+       of his age, below it under. ${curve.length ? "" : "Age curve unavailable for this position."}</p>
+  </div>
+
   <details class="season-log">
     <summary>Season log</summary>
     <div class="scroll">
-    <table class="nums">
+    <table class="log nums">
       <thead><tr><th>Season</th><th>League</th><th>Team</th><th>Min</th>
         <th>G</th><th>A</th><th>G+A /90</th><th>Value</th></tr></thead>
       <tbody>
-      ${rows.slice().reverse().map(r=>`
+      ${rows.slice().reverse().map(r => `
         <tr>
           <td>${esc(r.season)}</td>
           <td class="dim">${esc(r.league.split("-")[0])}</td>
@@ -570,66 +964,337 @@ function render(rows, moves, srow, peers, seasons, curve = []){
     </div>
   </details>`;
 
-  document.getElementById("chips").addEventListener("click", e => {
-    const s = e.target.dataset?.s;
-    if(!s) return;
-    const u = new URL(location);
-    u.searchParams.set("s", s);
-    history.pushState({}, "", u);
-    load();
-  });
-  // Renders the narrow markdown subset the agent's system prompt is locked to
-  // (## headers, **bold**, - bullets, pipe tables). Keep in sync with
-  // Soccer Data Hub/src/soccerhub/agent.py _SYSTEM_INSTRUCTION.
-  function renderAskMd(md){
-    const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-    const bold = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    const lines = md.split("\n");
-    let html = "", i = 0;
-    while(i < lines.length){
-      const line = lines[i];
-      if(/^##\s+/.test(line)){
-        html += `<h3>${bold(line.replace(/^##\s+/, ""))}</h3>`;
-        i++;
-      } else if(/^\|.+\|\s*$/.test(line)){
-        const rows = [];
-        while(i < lines.length && /^\|.+\|\s*$/.test(lines[i])){
-          rows.push(lines[i].trim().slice(1, -1).split("|").map(c => c.trim()));
-          i++;
-        }
-        const isSep = r => r.every(c => /^:?-+:?$/.test(c));
-        const head = rows[0], body = rows[isSep(rows[1] || []) ? 2 : 1] ? rows.slice(isSep(rows[1] || []) ? 2 : 1) : [];
-        html += "<table><thead><tr>" + head.map(c => `<th>${bold(c)}</th>`).join("") + "</tr></thead><tbody>"
-          + body.map(r => "<tr>" + r.map(c => `<td>${bold(c)}</td>`).join("") + "</tr>").join("")
-          + "</tbody></table>";
-      } else if(/^-\s+/.test(line)){
-        const items = [];
-        while(i < lines.length && /^-\s+/.test(lines[i])){
-          items.push(lines[i].replace(/^-\s+/, ""));
-          i++;
-        }
-        html += "<ul>" + items.map(it => `<li>${bold(it)}</li>`).join("") + "</ul>";
-      } else if(line.trim() === ""){
-        i++;
-      } else {
-        html += `<p>${bold(line)}</p>`;
-        i++;
-      }
-    }
-    return html;
+  wireValueTooltips(m, typical);
+}
+
+/* transfer date -> season start-year label ('2022-07-01' -> '2022') */
+const moveSeason = d => {
+  const [y,m] = d.split("-").map(Number);
+  return String(m >= 7 ? y : y-1);
+};
+
+// league seasons: 34 games in the Bundesliga, 38 everywhere else in the big five
+const availability = r => Math.min(1, (r.minutes||0) /
+  ((r.league?.startsWith("GER") ? 34 : 38) * 90));
+
+/* ---------- price vs output scatter ----------
+   Real euros on a log x-axis against the raw output rate, not percentile
+   against percentile. Value is heavily skewed — a handful of players cost
+   ten times the median — so log keeps the cheap half from collapsing into
+   the axis. The peer medians split it into four quadrants, which needs no
+   regression to read: left of the vertical line is cheap, above the
+   horizontal one is productive.                                           */
+function scatter(m){
+  const W=620, H=300, PL=54, PB=40, PT=16, PR=18;
+  const key = m.metric.key;
+  const ok = p => p.market_value_in_eur > 0 && p[key] != null;
+  const pool = m.pool.filter(ok);
+  const meOk = ok(m.me);
+
+  if(pool.length < 8 || !meOk)
+    return `<svg viewBox="0 0 ${W} ${H}"><text x="${W/2}" y="${H/2}" text-anchor="middle"
+      fill="var(--muted)" font-size="14">${pool.length < 8 ? "peer pool too small to rank" :
+      `no ${m.metric.label} or market value for this season`}</text></svg>`;
+
+  const lg = v => Math.log10(v);
+  const vs = [...pool.map(p => p.market_value_in_eur), m.me.market_value_in_eur];
+  const os = [...pool.map(p => p[key]), m.me[key]];
+  const x0 = lg(Math.min(...vs)), x1 = lg(Math.max(...vs));
+  const yMax = Math.max(...os) * 1.08 || 1;
+  const px = v => PL + (W-PL-PR) * (lg(v)-x0) / ((x1-x0) || 1);
+  const py = v => H-PB - (H-PT-PB) * (v / yMax);
+
+  const med = arr => { const s = [...arr].sort((a,b) => a-b), n = s.length;
+    return n % 2 ? s[(n-1)/2] : (s[n/2-1]+s[n/2])/2; };
+  const mv = med(pool.map(p => p.market_value_in_eur)), mo = med(pool.map(p => p[key]));
+
+  // one tick per power of ten inside the range, plus the ends
+  const ticks = [];
+  for(let e = Math.floor(x0); e <= Math.ceil(x1); e++){
+    const v = 10**e;
+    if(lg(v) >= x0 && lg(v) <= x1) ticks.push(v);
   }
+  if(!ticks.length) ticks.push(10**x0, 10**x1);
+
+  // data-p indexes the FULL pool, so the tooltip still resolves
+  const dots = m.pool.map((p,i) => !ok(p) ? "" :
+    `<circle data-p="${i}" cx="${px(p.market_value_in_eur).toFixed(1)}"
+      cy="${py(p[key]).toFixed(1)}" r="4.5" fill="rgba(242,245,239,.30)"/>`).join("");
+
+  return `<svg viewBox="0 0 ${W} ${H}" id="schart" aria-label="Market value against output rate among positional peers">
+    <line x1="${px(mv).toFixed(1)}" x2="${px(mv).toFixed(1)}" y1="${PT}" y2="${H-PB}"
+      stroke="var(--chalk-y)" stroke-opacity=".45" stroke-dasharray="5 5"/>
+    <line x1="${PL}" x2="${W-PR}" y1="${py(mo).toFixed(1)}" y2="${py(mo).toFixed(1)}"
+      stroke="var(--chalk-y)" stroke-opacity=".45" stroke-dasharray="5 5"/>
+    <text x="${PL+8}" y="${PT+12}" fill="var(--axis)" font-size="11">cheap · productive</text>
+    <text x="${W-PR-8}" y="${H-PB-8}" text-anchor="end" fill="var(--axis)" font-size="11">expensive · quiet</text>
+    ${dots}
+    <circle cx="${px(m.me.market_value_in_eur).toFixed(1)}" cy="${py(m.me[key]).toFixed(1)}"
+      r="8" fill="var(--amber)" stroke="var(--card)" stroke-width="2"/>
+    <line x1="${PL}" x2="${W-PR}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
+    <line x1="${PL}" x2="${PL}" y1="${PT}" y2="${H-PB}" stroke="var(--axis)"/>
+    ${ticks.map(v => `<text x="${px(v).toFixed(1)}" y="${H-PB+14}" text-anchor="middle"
+      font-size="10" fill="var(--axis)">${eur(v)}</text>`).join("")}
+    <text x="${PL-8}" y="${PT+8}" text-anchor="end" font-size="10" fill="var(--axis)">${m.metric.fmt(yMax) ?? ""}</text>
+    <text x="${PL}" y="${H-6}" fill="var(--axis)" font-size="11">market value (log) →</text>
+    <text x="14" y="${H-PB}" fill="var(--axis)" font-size="11"
+      transform="rotate(-90 14 ${H-PB})">${m.metric.label} →</text>
+  </svg>`;
+}
+
+/* ---------- career charts (shared x band scale) ---------- */
+const W=720, PAD_L=52, PAD_R=14;
+const bandX = (rs,i) => PAD_L + (W-PAD_L-PAD_R) * (i + .5) / rs.length;
+
+// Market value against the same-position average for that age, on ONE euro
+// axis. The benchmark only means anything next to the player's own line, so
+// it lives here rather than shape-fitted on the trend chart.
+function valueChart(rs, mv = [], typical = {}){
+  const H=210, PT=14, PB=26;
+  const seasonIdx = Object.fromEntries(rs.map((r,i) => [r.season,i]));
+  const recorded = new Set(mv.map(t => seasonIdx[moveSeason(t.transfer_date)])
+                             .filter(i => i!=null));
+  const vlines = mv.map(t => {
+    const i = seasonIdx[moveSeason(t.transfer_date)];
+    if(i==null) return "";
+    return `<line x1="${bandX(rs,i)}" x2="${bandX(rs,i)}" y1="${PT}" y2="${H-PB}"
+      stroke="var(--line)" stroke-opacity=".35" stroke-dasharray="5 5">
+      <title>${t.transfer_date}: ${t.from_club_name ?? "?"} → ${t.to_club_name ?? "?"}${t.transfer_fee ? " · "+eur(t.transfer_fee) : ""}</title></line>`;
+  }).join("");
+
+  // fallback: transfer records are patchy upstream, but the season log
+  // itself shows the club changing — mark those moves too (dotted, no fee)
+  const bySeason = new Map();
+  rs.forEach((r,i) => {
+    if(!bySeason.has(r.season)) bySeason.set(r.season, {i, teams:new Set()});
+    bySeason.get(r.season).teams.add(r.team);
+  });
+  const ss = [...bySeason.entries()].sort((a,b) => a[0]<b[0] ? -1 : 1);
+  const synth = ss.map(([s,cur],k) => {
+    if(!k) return "";
+    const prev = ss[k-1][1];
+    const stayed = [...cur.teams].some(t => prev.teams.has(t));
+    if(stayed || recorded.has(cur.i)) return "";
+    return `<line x1="${bandX(rs,cur.i)}" x2="${bandX(rs,cur.i)}" y1="${PT}" y2="${H-PB}"
+      stroke="var(--line)" stroke-opacity=".25" stroke-dasharray="2 5">
+      <title>${s}: ${[...prev.teams].join("/")} → ${[...cur.teams].join("/")} (no transfer record)</title></line>`;
+  }).join("");
+  const vals  = rs.map(r => r.market_value_in_eur);
+  const tvals = rs.map(r => r.age!=null ? (typical[r.age] ?? null) : null);
+  // one scale for both series, or the comparison the chart exists for is a lie
+  const max = Math.max(...[...vals, ...tvals].filter(v => v!=null), 1);
+  const y = v => PT + (H-PT-PB) * (1 - v/max);
+
+  const segsOf = series => {
+    const pts = rs.map((r,i) => series[i]==null ? null : [bandX(rs,i), y(series[i])]);
+    const seg=[]; let run=[];
+    for(const p of pts){ if(p) run.push(p); else {if(run.length)seg.push(run); run=[];} }
+    if(run.length) seg.push(run);
+    return {pts, seg};
+  };
+  const {pts, seg} = segsOf(vals);
+  const tSeg = segsOf(tvals).seg;
+
+  const line = seg.map(s => "M"+s.map(p => p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")).join(" ");
+  const area = seg.map(s => `M${s[0][0]} ${H-PB} L`+s.map(p => p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")
+      +` L ${s[s.length-1][0]} ${H-PB} Z`).join(" ");
+  const tLine = tSeg.map(s => `<path fill="none" stroke="var(--chalk-y)" stroke-width="2"
+      stroke-dasharray="6 4" d="M${s.map(p => p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")}"/>`).join("");
+  const gridVals=[max, max/2];
+  return `<svg viewBox="0 0 ${W} ${H}" id="vchart" aria-label="Market value by season">
+    ${gridVals.map(g => `<line x1="${PAD_L}" x2="${W-PAD_R}" y1="${y(g)}" y2="${y(g)}"
+        stroke="var(--grid)"/><text x="${PAD_L-6}" y="${y(g)+4}" text-anchor="end"
+        font-size="11" fill="var(--axis)">${eur(g)}</text>`).join("")}
+    <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
+    ${vlines}${synth}
+    <path d="${area}" fill="var(--amber)" opacity=".14"/>
+    ${tLine}
+    <path d="${line}" fill="none" stroke="var(--amber)" stroke-width="2"/>
+    ${pts.map(p => p ? `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="var(--amber)"
+        stroke="var(--card)" stroke-width="2"/>` : "").join("")}
+    ${xAxis(rs,H,PB)}
+    <line id="vcross" y1="${PT}" y2="${H-PB}" stroke="var(--axis)" stroke-dasharray="3 3"
+        visibility="hidden"/>
+  </svg>`;
+}
+
+// npGoals bars vs npxG line — shared count axis, so the gap IS the finishing
+function xgChart(rs){
+  const H=170, PT=14, PB=26;
+  const g  = rs.map(r => r.np_xg==null ? null : (r.non_penalty_goals ?? 0));
+  const xg = rs.map(r => r.np_xg);
+  const max = Math.max(...[...g, ...xg].filter(v => v!=null), 1);
+  const y = v => H-PB-(H-PT-PB)*(v/max);
+  const bw = Math.min(24,(W-PAD_L-PAD_R)/rs.length-2);
+  const bars = rs.map((r,i) => g[i]==null ? "" : `
+    <rect x="${(bandX(rs,i)-bw/2).toFixed(1)}" y="${y(g[i]).toFixed(1)}"
+      width="${bw.toFixed(1)}" height="${Math.max(H-PB-y(g[i]),1).toFixed(1)}"
+      rx="3" fill="var(--green)" opacity=".85"/>`).join("");
+  const pts = rs.map((r,i) => xg[i]==null ? null : [bandX(rs,i), y(xg[i])]);
+  const seg=[]; let run=[];
+  for(const p of pts){ if(p) run.push(p); else {if(run.length>1)seg.push(run); run=[];} }
+  if(run.length>1) seg.push(run);
+  const line = seg.map(s => `<path fill="none" stroke="var(--chalk-y)" stroke-width="2"
+    d="M${s.map(p => p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")}"/>`).join("");
+  const dots = pts.map(p => p ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}"
+    r="3" fill="var(--chalk-y)"/>` : "").join("");
+  return `<svg viewBox="0 0 ${W} ${H}" id="xchart" aria-label="Non-penalty goals versus expected goals by season">
+    <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
+    <text x="${PAD_L-6}" y="${PT+8}" text-anchor="end" font-size="11" fill="var(--axis)">${Math.round(max)}</text>
+    ${bars}${line}${dots}
+    ${xAxis(rs,H,PB)}
+    <line id="xcross" y1="${PT}" y2="${H-PB}" stroke="var(--axis)" stroke-dasharray="3 3"
+        visibility="hidden"/>
+  </svg>`;
+}
+
+/* ---------- minutes by season ----------
+   A real axis, in minutes. This used to be three shape-fitted lines whose
+   crossings meant nothing; the age benchmark moved to the value chart and
+   the output rate is already the xG chart's job, so what's left is the one
+   thing nothing else plots over time: availability.                       */
+const FULL_SEASON = 38*90;   // 3,420 — the big-five maximum (34 games in Germany)
+
+function minutesChart(rs){
+  const H=150, PT=14, PB=26;
+  const max = Math.max(FULL_SEASON, ...rs.map(r => r.minutes || 0));
+  const y = v => PT + (H-PT-PB) * (1 - v/max);
+  const pts = rs.map((r,i) => r.minutes==null ? null : [bandX(rs,i), y(r.minutes)]);
+  const seg=[]; let run=[];
+  for(const p of pts){ if(p) run.push(p); else {if(run.length)seg.push(run); run=[];} }
+  if(run.length) seg.push(run);
+  const line = seg.map(s => `<path fill="none" stroke="var(--blue)" stroke-width="2"
+    d="M${s.map(p => p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")}"/>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" id="tchart" aria-label="Minutes played by season">
+    <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${y(FULL_SEASON).toFixed(1)}"
+      y2="${y(FULL_SEASON).toFixed(1)}" stroke="var(--grid)" stroke-dasharray="4 4"/>
+    <text x="${PAD_L-6}" y="${(y(FULL_SEASON)+4).toFixed(1)}" text-anchor="end"
+      font-size="10" fill="var(--axis)">every minute</text>
+    <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${y(FULL_SEASON/2).toFixed(1)}"
+      y2="${y(FULL_SEASON/2).toFixed(1)}" stroke="var(--grid)"/>
+    <text x="${PAD_L-6}" y="${(y(FULL_SEASON/2)+4).toFixed(1)}" text-anchor="end"
+      font-size="10" fill="var(--axis)">half</text>
+    <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
+    ${line}
+    ${pts.map(p => p ? `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5"
+      fill="var(--blue)" stroke="var(--card)" stroke-width="2"/>` : "").join("")}
+    ${xAxis(rs,H,PB)}
+    <line id="tcross" y1="${PT}" y2="${H-PB}" stroke="var(--axis)" stroke-dasharray="3 3"
+        visibility="hidden"/>
+  </svg>`;
+}
+
+function xAxis(rs,H,PB){
+  const step = Math.ceil(rs.length/9);
+  return rs.map((r,i) => i%step ? "" :
+    `<text x="${bandX(rs,i)}" y="${H-PB+16}" text-anchor="middle" font-size="11"
+      fill="var(--axis)">'${r.season.slice(2)}</text>`).join("");
+}
+
+/* ---------- hover layer for the value tab's four charts ---------- */
+// The three career charts share an x band scale, so they share a crosshair
+// and the season lookup behind it; only the tooltip body differs.
+function bandHover(svgId, crossId, body){
+  const svg = document.getElementById(svgId), cross = document.getElementById(crossId);
+  if(!svg) return;
+  svg.addEventListener("mousemove", e => {
+    const box = svg.getBoundingClientRect();
+    const x = (e.clientX-box.left)/box.width*W;
+    const i = Math.max(0, Math.min(rows.length-1,
+      Math.floor((x-PAD_L)/(W-PAD_L-PAD_R)*rows.length)));
+    cross.setAttribute("x1",bandX(rows,i)); cross.setAttribute("x2",bandX(rows,i));
+    cross.setAttribute("visibility","visible");
+    showTip(e, body(rows[i]));
+  });
+  svg.addEventListener("mouseleave", () => { hideTip(); cross.setAttribute("visibility","hidden"); });
+}
+
+function wireValueTooltips(m, typical = {}){
+  // the scatter is the odd one out: dots, not bands
+  const s = document.getElementById("schart");
+  if(s){
+    s.addEventListener("mousemove", e => {
+      const c = e.target.closest("circle[data-p]");
+      if(!c){ hideTip(); return; }
+      const p = m.pool[+c.dataset.p];
+      showTip(e, `<div class="t">${esc(p.player_name)} · ${esc(p.team)}</div>
+        ${m.metric.fmt(p[m.metric.key]) ?? "—"} ${esc(m.metric.label)} · ${eur(p.market_value_in_eur)}
+        · ${p.minutes} min`);
+    });
+    s.addEventListener("mouseleave", hideTip);
+  }
+
+  bandHover("vchart", "vcross", r => {
+    const tv = r.age!=null ? typical[r.age] : null;
+    const gap = tv!=null && r.market_value_in_eur!=null ? r.market_value_in_eur - tv : null;
+    return `<div class="t">${esc(r.season)} · ${esc(r.team)}${r.age!=null?" · age "+r.age:""}</div>
+      ${eur(r.market_value_in_eur)}${r.value_is_stale?" ⚠":""}<br>
+      typical ${eur(tv)}${gap!=null
+        ? ` · <span style="color:${gap>0?"var(--amber)":"var(--green)"}">${gap>0?"+":"−"}${eur(Math.abs(gap))}</span>`
+        : ""}`;
+  });
+
+  bandHover("xchart", "xcross", r => {
+    const d = r.np_xg!=null ? (r.non_penalty_goals ?? 0) - r.np_xg : null;
+    return `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
+      ${r.np_xg!=null
+        ? `${r.non_penalty_goals ?? 0} npG vs ${r.np_xg.toFixed(1)} npxG<br>
+           ${d>0?"+":""}${d.toFixed(1)} ${d>0?"over":"under"}performance`
+        : "no xG data this season"}`;
+  });
+
+  bandHover("tchart", "tcross", r => {
+    // a Bundesliga season is 34 games, so the share is against the player's own league
+    const full = (r.league?.startsWith("GER") ? 34 : 38) * 90;
+    return `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
+      ${(r.minutes ?? 0).toLocaleString("en")} min · ${Math.round(100*(r.minutes||0)/full)}% of the season`;
+  });
+}
+
+/* ====================================================================
+   Ask tab — the Layer-3 agent over the hub data. Fetches nothing until
+   Ask is pressed; the agent does its own lookups server-side.
+   ==================================================================== */
+function renderAsk(body){
+  body.innerHTML = `
+  <div class="box">
+    <h2><span class="swatch" style="background:var(--blue)"></span>Ask the analyst
+      <span class="plain">· AI over the hub data</span></h2>
+    <div class="ask-row">
+      <label for="ask-model" class="dim" style="align-self:center;font-size:.8rem">Model</label>
+      <select id="ask-model">
+        <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+        <option value="gemini-3.6-flash" selected>Gemini 3.6 Flash</option>
+        <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+        <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+      </select>
+    </div>
+    <div class="ask-row">
+      <input id="ask-q" type="text" autocomplete="off"
+        placeholder="e.g. How does this player compare to his positional peers?">
+      <button id="ask-go" type="button">Ask</button>
+    </div>
+    <div id="ask-out" class="dim">Answers use live hub data via the agent. Free-text — one question at a time.</div>
+  </div>`;
+
   const askQ = document.getElementById("ask-q");
   const askGo = document.getElementById("ask-go");
   const askOut = document.getElementById("ask-out");
   const askModel = document.getElementById("ask-model");
+
   async function doAsk(){
     const q = askQ.value.trim();
     if(!q) return;
     askGo.disabled = true;
     askOut.className = "dim";
     askOut.textContent = "Thinking…";
-    const prompt = `Context: ${srow.player_name}, ${srow.season} ${srow.league}. Question: ${q}`;
-    try {
+    // career context, matching the hero strip — the agent should not think
+    // it is being asked about one season unless the question says so
+    const c = careerModel(), last = c.last;
+    const prompt = `Context: ${last.player_name}, ${last.primary_position ?? "?"}, ` +
+      `${last.team} (${last.league}), career ${c.span}, ${c.minutes} minutes, ` +
+      `${c.goals} goals, ${c.assists} assists. Question: ${q}`;
+    try{
       const r = await fetch(AGENT_ENDPOINT, {
         method: "POST", headers: {"Content-Type":"application/json"},
         body: JSON.stringify({ prompt, model: askModel.value })
@@ -638,248 +1303,494 @@ function render(rows, moves, srow, peers, seasons, curve = []){
       if(!r.ok) throw new Error(data.detail || r.statusText);
       askOut.className = "";
       askOut.innerHTML = data.answer ? renderAskMd(data.answer) : "(no answer)";
-    } catch(e){
+    }catch(e){
       askOut.className = "dim";
       askOut.textContent = "Agent unavailable: " + e.message;
-    } finally {
+    }finally{
       askGo.disabled = false;
     }
   }
   askGo.addEventListener("click", doAsk);
   askQ.addEventListener("keydown", e => { if(e.key === "Enter") doAsk(); });
-  wireTooltips(rows, m, typical);
 }
 
-/* ---------- value-vs-output scatter ---------- */
-function scatter(m){
-  const W=620, H=300, PL=44, PB=34, PT=14, PR=16;
-  const px = p => PL + (W-PL-PR)*p/100;
-  const py = p => H-PB - (H-PT-PB)*p/100;
-  if(m.pool.length < 8 || m.pct[m.metric.key]==null)
-    return `<svg viewBox="0 0 ${W} ${H}"><text x="${W/2}" y="${H/2}" text-anchor="middle"
-      fill="var(--muted)" font-size="14">${m.pool.length < 8 ? "peer pool too small to rank" :
-      `no ${m.metric.label} data for this season`}</text></svg>`;
-  const vPct = pctsOf(m.pool, "market_value_in_eur");
-  const oPct = pctsOf(m.pool, m.metric.key);
-  const dots = m.pool.map((p,i)=>{
-    const x = vPct(p.market_value_in_eur), y = oPct(p[m.metric.key]);
-    if(x==null||y==null) return "";
-    return `<circle data-p="${i}" cx="${px(x).toFixed(1)}" cy="${py(y).toFixed(1)}" r="4.5"
-      fill="rgba(242,245,239,.30)"/>`;
-  }).join("");
-  const mx = m.pct.market_value_in_eur, my = m.pct[m.metric.key];
-  const me = (mx!=null && my!=null) ?
-    `<circle cx="${px(mx)}" cy="${py(my)}" r="8" fill="var(--amber)" stroke="var(--card)" stroke-width="2"/>` : "";
-  return `<svg viewBox="0 0 ${W} ${H}" id="schart" aria-label="Market value percentile vs output percentile among positional peers">
-    <line x1="${PL}" y1="${py(0)}" x2="${px(100)}" y2="${py(100)}"
-      stroke="var(--chalk-y)" stroke-opacity=".5" stroke-dasharray="5 5"/>
-    <text x="${PL+8}" y="${PT+12}" fill="var(--axis)" font-size="11">bargain zone</text>
-    <text x="${px(100)-104}" y="${py(0)-8}" fill="var(--axis)" font-size="11">premium zone</text>
-    ${dots}${me}
-    <line x1="${PL}" x2="${W-PR}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
-    <line x1="${PL}" x2="${PL}" y1="${PT}" y2="${H-PB}" stroke="var(--axis)"/>
-    <text x="${PL}" y="${H-8}" fill="var(--axis)" font-size="11">market value percentile →</text>
-    <text x="12" y="${H-PB}" fill="var(--axis)" font-size="11"
-      transform="rotate(-90 12 ${H-PB})">${m.metric.label} percentile →</text>
-  </svg>`;
+// Renders the narrow markdown subset the agent's system prompt is locked to
+// (## headers, **bold**, - bullets, pipe tables). Keep in sync with
+// Soccer Data Hub/src/soccerhub/agent.py _SYSTEM_INSTRUCTION.
+function renderAskMd(md){
+  const bold = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  const lines = md.split("\n");
+  let html = "", i = 0;
+  while(i < lines.length){
+    const line = lines[i];
+    if(/^##\s+/.test(line)){
+      html += `<h3>${bold(line.replace(/^##\s+/, ""))}</h3>`;
+      i++;
+    } else if(/^\|.+\|\s*$/.test(line)){
+      const rs = [];
+      while(i < lines.length && /^\|.+\|\s*$/.test(lines[i])){
+        rs.push(lines[i].trim().slice(1, -1).split("|").map(c => c.trim()));
+        i++;
+      }
+      const isSep = r => r.every(c => /^:?-+:?$/.test(c));
+      const head = rs[0];
+      const body = rs.slice(isSep(rs[1] || []) ? 2 : 1);
+      html += "<table><thead><tr>" + head.map(c => `<th>${bold(c)}</th>`).join("") + "</tr></thead><tbody>"
+        + body.map(r => "<tr>" + r.map(c => `<td>${bold(c)}</td>`).join("") + "</tr>").join("")
+        + "</tbody></table>";
+    } else if(/^-\s+/.test(line)){
+      const items = [];
+      while(i < lines.length && /^-\s+/.test(lines[i])){
+        items.push(lines[i].replace(/^-\s+/, ""));
+        i++;
+      }
+      html += "<ul>" + items.map(it => `<li>${bold(it)}</li>`).join("") + "</ul>";
+    } else if(line.trim() === ""){
+      i++;
+    } else {
+      html += `<p>${bold(line)}</p>`;
+      i++;
+    }
+  }
+  return html;
 }
 
-/* ---------- career charts (shared x band scale) ---------- */
-const W=720, PAD_L=52, PAD_R=14;
-const bandX = (rows,i) => PAD_L + (W-PAD_L-PAD_R) * (i + .5) / rows.length;
+/* ====================================================================
+   Technical tab — shots, game profile and the peer-ranked radar.
+   Everything here is Understat-era only (>= XG_SINCE) and is fetched
+   lazily, the first time the tab is opened.
+   ==================================================================== */
 
-function valueChart(rows, moves = []){
-  const H=210, PT=14, PB=26;
-  const seasonIdx = Object.fromEntries(rows.map((r,i)=>[r.season,i]));
-  const recorded = new Set(moves.map(t=>seasonIdx[moveSeason(t.transfer_date)])
-                                .filter(i=>i!=null));
-  const vlines = moves.map(t=>{
-    const i = seasonIdx[moveSeason(t.transfer_date)];
-    if(i==null) return "";
-    return `<line x1="${bandX(rows,i)}" x2="${bandX(rows,i)}" y1="${PT}" y2="${H-PB}"
-      stroke="var(--line)" stroke-opacity=".35" stroke-dasharray="5 5">
-      <title>${t.transfer_date}: ${t.from_club_name ?? "?"} → ${t.to_club_name ?? "?"}${t.transfer_fee ? " · "+eur(t.transfer_fee) : ""}</title></line>`;
-  }).join("");
+const techRows  = () => rows.filter(r => +r.season >= XG_SINCE);
+const techSrow  = () => techRows()[techRows().length-1] ?? rows[rows.length-1];
 
-  // fallback: transfer records are patchy upstream, but the season log
-  // itself shows the club changing — mark those moves too (dotted, no fee)
-  const bySeason = new Map();
-  rows.forEach((r,i)=>{
-    if(!bySeason.has(r.season)) bySeason.set(r.season, {i, teams:new Set()});
-    bySeason.get(r.season).teams.add(r.team);
-  });
-  const seasons = [...bySeason.entries()].sort((a,b)=>a[0]<b[0]?-1:1);
-  const synth = seasons.map(([s,cur],k)=>{
-    if(!k) return "";
-    const prev = seasons[k-1][1];
-    const stayed = [...cur.teams].some(t=>prev.teams.has(t));
-    if(stayed || recorded.has(cur.i)) return "";
-    return `<line x1="${bandX(rows,cur.i)}" x2="${bandX(rows,cur.i)}" y1="${PT}" y2="${H-PB}"
-      stroke="var(--line)" stroke-opacity=".25" stroke-dasharray="2 5">
-      <title>${s}: ${[...prev.teams].join("/")} → ${[...cur.teams].join("/")} (no transfer record)</title></line>`;
-  }).join("");
-  const vals = rows.map(r=>r.market_value_in_eur);
-  const max = Math.max(...vals.filter(v=>v!=null), 1);
-  const y = v => PT + (H-PT-PB) * (1 - v/max);
-  const pts = rows.map((r,i)=>vals[i]==null?null:[bandX(rows,i),y(vals[i])]);
-  const seg=[]; let run=[];
-  for(const p of pts){ if(p) run.push(p); else {if(run.length)seg.push(run); run=[];} }
-  if(run.length) seg.push(run);
-  const line = seg.map(s=>"M"+s.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")).join(" ");
-  const area = seg.map(s=>`M${s[0][0]} ${H-PB} L`+s.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")
-      +` L ${s[s.length-1][0]} ${H-PB} Z`).join(" ");
-  const gridVals=[max, max/2];
-  return `<svg viewBox="0 0 ${W} ${H}" id="vchart" aria-label="Market value by season">
-    ${gridVals.map(g=>`<line x1="${PAD_L}" x2="${W-PAD_R}" y1="${y(g)}" y2="${y(g)}"
-        stroke="var(--grid)"/><text x="${PAD_L-6}" y="${y(g)+4}" text-anchor="end"
-        font-size="11" fill="var(--axis)">${eur(g)}</text>`).join("")}
-    <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
-    ${vlines}${synth}
-    <path d="${area}" fill="var(--amber)" opacity=".14"/>
-    <path d="${line}" fill="none" stroke="var(--amber)" stroke-width="2"/>
-    ${pts.map((p,i)=>p?`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="var(--amber)"
-        stroke="var(--card)" stroke-width="2"/>`:"").join("")}
-    ${xAxis(rows,H,PB)}
-    <line id="vcross" y1="${PT}" y2="${H-PB}" stroke="var(--axis)" stroke-dasharray="3 3"
-        visibility="hidden"/>
-  </svg>`;
-}
+let shots = [];
+const peerCache = new Map(), careerCache = new Map();
 
-// a trend-line key is either a row field name or an accessor function
-// (the age-curve line has no column — it looks up the per-age average)
-const asGetter = key => typeof key === "function" ? key : (r => r[key]);
+// one fetch per player: every shot, then filtered per season in the view
+const loadShots = once(async () => {
+  const uid = [...rows].reverse().find(r => r.understat_id != null)?.understat_id;
+  if(uid == null) return shots = [];
+  try{ return shots = await hubAll("shots_understat",
+    {select:"season,date,team,xg,location_x,location_y,body_part,situation,result,minute",
+     player_id:`eq.${uid}`, order:"date"}); }
+  catch{ return shots = []; }      // map degrades to a stated gap
+});
 
-// npGoals bars vs npxG line — shared count axis, so the gap IS the finishing
-function xgChart(rows){
-  const H=170, PT=14, PB=26;
-  const g  = rows.map(r=>r.np_xg==null ? null : (r.non_penalty_goals ?? 0));
-  const xg = rows.map(r=>r.np_xg);
-  const max = Math.max(...[...g, ...xg].filter(v=>v!=null), 1);
-  const y = v => H-PB-(H-PT-PB)*(v/max);
-  const bw = Math.min(24,(W-PAD_L-PAD_R)/rows.length-2);
-  const bars = rows.map((r,i)=> g[i]==null ? "" : `
-    <rect x="${(bandX(rows,i)-bw/2).toFixed(1)}" y="${y(g[i]).toFixed(1)}"
-      width="${bw.toFixed(1)}" height="${Math.max(H-PB-y(g[i]),1).toFixed(1)}"
-      rx="3" fill="var(--green)" opacity=".85"/>`).join("");
-  const pts = rows.map((r,i)=>xg[i]==null?null:[bandX(rows,i), y(xg[i])]);
-  const seg=[]; let run=[];
-  for(const p of pts){ if(p) run.push(p); else {if(run.length>1)seg.push(run); run=[];} }
-  if(run.length>1) seg.push(run);
-  const line = seg.map(s=>`<path fill="none" stroke="var(--chalk-y)" stroke-width="2"
-    d="M${s.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")}"/>`).join("");
-  const dots = pts.map(p=>p?`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}"
-    r="3" fill="var(--chalk-y)"/>`:"").join("");
-  return `<svg viewBox="0 0 ${W} ${H}" id="xchart" aria-label="Non-penalty goals versus expected goals by season">
-    <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
-    <text x="${PAD_L-6}" y="${PT+8}" text-anchor="end" font-size="11" fill="var(--axis)">${Math.round(max)}</text>
-    ${bars}${line}${dots}
-    ${xAxis(rows,H,PB)}
-    <line id="xcross" y1="${PT}" y2="${H-PB}" stroke="var(--axis)" stroke-dasharray="3 3"
-        visibility="hidden"/>
-  </svg>`;
-}
-
-// position-aware line set shared by the trend chart, its legend and tooltip
-const trendLines = (m, typical = {}) => [
-  ["minutes", "var(--blue)", "Minutes", v=>v ?? "—"],
-  [r => r.age!=null ? typical[r.age] : null, "var(--chalk-y)", "Typical value",
-    v=>v!=null ? eur(v) : "—"],
-  [m.metric.key, "var(--green)", m.metric.label, v=>m.metric.fmt(v) ?? "—"],
+/* ---------- radar metric definitions ----------
+   Each axis: want -> proxy -> grade. Rates are per 90, computed from summed
+   totals so a career view is minutes-weighted rather than an average of
+   averages. `inv:true` means lower raw value is better, so the percentile is
+   flipped and a full axis always reads "good".                              */
+const GROUPS = [
+  {name:"Attack", color:"var(--amber)", grade:"direct",
+   note:"Understat's xG model; shot volume is team-dependent.",
+   axes:[
+     {k:"npxg90",  lab:"npxG /90",   fmt:v=>v.toFixed(2)},
+     {k:"sh90",    lab:"Shots /90",  fmt:v=>v.toFixed(2)},
+     {k:"xgsh",    lab:"xG /shot",   fmt:v=>v.toFixed(3)},
+     {k:"npg90",   lab:"npGoals /90",fmt:v=>v.toFixed(2)},
+   ]},
+  {name:"Playmaking", color:"var(--blue)", grade:"direct",
+   note:"xGBuildup credits every player in a possession equally — it measures involvement, not the quality of the contribution.",
+   axes:[
+     {k:"xa90",    lab:"xA /90",       fmt:v=>v.toFixed(2)},
+     {k:"kp90",    lab:"Key passes /90",fmt:v=>v.toFixed(2)},
+     {k:"chain90", lab:"xGChain /90",  fmt:v=>v.toFixed(2)},
+     {k:"build90", lab:"xGBuildup /90",fmt:v=>v.toFixed(2)},
+   ]},
+  {name:"Defense & discipline", color:"var(--green)", grade:"far",
+   note:"Volume, not quality: a dominant team's defender simply defends less, and the best defending — being positioned so nothing happens — leaves no event to count.",
+   axes:[
+     {k:"tkl90",   lab:"Tackles won /90", fmt:v=>v.toFixed(2)},
+     {k:"int90",   lab:"Interceptions /90",fmt:v=>v.toFixed(2)},
+     {k:"foul90",  lab:"Fouls /90",       fmt:v=>v.toFixed(2), inv:true},
+     {k:"card90",  lab:"Cards /90",       fmt:v=>v.toFixed(2), inv:true},
+   ]},
 ];
 
-// shape-fitted lines (units differ — no shared axis; real values in tooltip)
-function trendChart(rows, lines){
-  const H=150, PT=12, PB=24;
-  const line = (vals, color) => {
-    const vmax = Math.max(...vals.filter(v=>v!=null), 1e-9);
-    const pts = vals.map((v,i)=>v==null?null:
-      [bandX(rows,i), H-PB-(H-PT-PB)*.92*(v/vmax)]);
-    const seg=[]; let run=[];
-    for(const p of pts){ if(p) run.push(p); else {if(run.length>1)seg.push(run); run=[];} }
-    if(run.length>1) seg.push(run);
-    return seg.map(s=>`<path fill="none" stroke="${color}" stroke-width="2"
-      d="M${s.map(p=>p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" L ")}"/>`).join("");
-  };
-  return `<svg viewBox="0 0 ${W} ${H}" id="tchart" aria-label="Career trend lines">
-    <line x1="${PAD_L}" x2="${W-PAD_R}" y1="${H-PB}" y2="${H-PB}" stroke="var(--axis)"/>
-    ${lines.map(([key,color])=>line(rows.map(asGetter(key)), color)).join("")}
-    ${xAxis(rows,H,PB)}
-    <line id="tcross" y1="${PT}" y2="${H-PB}" stroke="var(--axis)" stroke-dasharray="3 3"
-        visibility="hidden"/>
-  </svg>`;
+// midrank percentile: a pool tied on a value reads 50, not 0
+function pctOf(vals, v){
+  if(v==null || vals.length < 8) return null;
+  const s = [...vals].sort((a,b)=>a-b);
+  let lo=0, hi=s.length;
+  while(lo<hi){ const m=(lo+hi)>>1; if(s[m]<v) lo=m+1; else hi=m; }
+  let up=lo, hi2=s.length;
+  while(up<hi2){ const m=(up+hi2)>>1; if(s[m]<=v) up=m+1; else hi2=m; }
+  const mid = lo + Math.max(up-lo-1,0)/2;
+  return Math.round(100*mid/Math.max(s.length-1,1));
 }
 
-function xAxis(rows,H,PB){
-  const step = Math.ceil(rows.length/9);
-  return rows.map((r,i)=> i%step ? "" :
-    `<text x="${bandX(rows,i)}" y="${H-PB+16}" text-anchor="middle" font-size="11"
-      fill="var(--axis)">'${r.season.slice(2)}</text>`).join("");
+async function peerPool(league, pos, season){
+  const key = `${league}|${pos}|${season}`;
+  if(!peerCache.has(key)){
+    const params = {select:"player_name,tm_id,nineties,np_xg,non_penalty_goals,shots,xa," +
+      "key_passes,xg_chain,xg_buildup,tackles_won,interceptions,fouls_committed," +
+      "yellow_cards,red_cards", league:`eq.${league}`, primary_position:`eq.${pos}`};
+    params.season = season === "career" ? `gte.${XG_SINCE}` : `eq.${season}`;
+    peerCache.set(key, hubAll("player_season", params).then(rs => {
+      // career mode ranks whole careers, so peers are aggregated the same way.
+      // Key on tm_id — two players can share a name, and merging them would
+      // invent a peer with nobody's real rates.
+      const byPlayer = new Map();
+      for(const r of rs){
+        const k = r.tm_id ?? `name:${r.player_name}`;
+        if(!byPlayer.has(k)) byPlayer.set(k, []);
+        byPlayer.get(k).push(r);
+      }
+      const out = [];
+      for(const rs2 of byPlayer.values()){
+        const q = rates(rs2);
+        if(q && q.n90 >= MIN_90S_PEER) out.push(q);
+      }
+      return out;
+    }));
+  }
+  return peerCache.get(key);
 }
 
-/* ---------- hover layer ---------- */
-function wireTooltips(rows, m, typical = {}){
-  const tip = document.getElementById("tip");
-  const show = (e,html) => { tip.innerHTML = html; tip.style.display = "block";
-    tip.style.left = Math.min(e.clientX+14, innerWidth-190)+"px";
-    tip.style.top = (e.clientY+14)+"px"; };
-  const hide = () => tip.style.display = "none";
+// career rows per comparison player, cached — they need the same rates()
+async function playerCareer(tm){
+  if(!careerCache.has(tm))
+    careerCache.set(tm, hub("player_season",
+      {select:"*", tm_id:`eq.${tm}`, season:`gte.${XG_SINCE}`, order:"season"}));
+  return careerCache.get(tm);
+}
 
-  const s = document.getElementById("schart");
-  if(s) s.addEventListener("mousemove", e => {
-    const c = e.target.closest("circle[data-p]");
-    if(!c){ hide(); return; }
-    const p = m.pool[+c.dataset.p];
-    show(e, `<div class="t">${esc(p.player_name)} · ${esc(p.team)}</div>
-      ${m.metric.fmt(p[m.metric.key]) ?? "—"} ${esc(m.metric.label)} · ${eur(p.market_value_in_eur)}
-      · ${p.minutes} min`);
+/* ---------- compare-player picker ---------- */
+// per-player series colours for compare mode (main is [0])
+const SERIES = ["var(--amber)","var(--blue)","var(--chalk-y)","var(--red)"];
+const MAX_VS = 3;   // main + 3 comparisons
+
+const addVs = tm => {
+  const v = vsList();
+  if(!v.includes(tm) && tm !== mainTm() && v.length < MAX_VS){ pushUrl({vs:[...v, tm]}); render(); }
+};
+const removeVs = tm => { pushUrl({vs: vsList().filter(x => x !== tm)}); render(); };
+
+function wireCompare(){
+  const q = document.getElementById("cmpq");
+  const res = document.getElementById("cmpresults");
+  if(!q) return;
+  let d;
+  q.addEventListener("input", () => {
+    clearTimeout(d);
+    const v = q.value.trim();
+    if(v.length < 3){ res.innerHTML = ""; res.style.display = "none"; return; }
+    d = setTimeout(async () => {
+      const found = await hub("player_season", {select:"player_name,tm_id,team,season",
+        player_name:`ilike.*${v}*`, season:`gte.${XG_SINCE}`, order:"season.desc", limit:"40"});
+      const seen = new Set(), pk = [];
+      for(const r of found){
+        if(r.tm_id == null || seen.has(r.tm_id) || String(r.tm_id) === mainTm()
+           || vsList().includes(String(r.tm_id))) continue;
+        seen.add(r.tm_id); pk.push(r); if(pk.length >= 6) break;
+      }
+      res.innerHTML = pk.map(p => `<button data-add="${p.tm_id}">${esc(p.player_name)}
+        <span class="sub">${esc(p.team)}</span></button>`).join("")
+        || `<button disabled>no match</button>`;
+      res.style.display = "block";
+    }, 300);
   });
-  if(s) s.addEventListener("mouseleave", hide);
+}
+document.addEventListener("click", cmpDocClick);  // once — survives re-renders
+function cmpDocClick(e){
+  const add = e.target.closest("#cmpresults [data-add]");
+  if(add){ addVs(add.dataset.add); return; }
+  const rm = e.target.closest("[data-rmvs]");
+  if(rm){ removeVs(rm.dataset.rmvs); return; }
+  const res = document.getElementById("cmpresults");
+  if(res && !e.target.closest(".cmpsearch")) res.style.display = "none";
+}
 
-  const v = document.getElementById("vchart"), cross = document.getElementById("vcross");
-  const idxFromEvent = (svg,e) => {
-    const r = svg.getBoundingClientRect();
-    const x = (e.clientX-r.left)/r.width*W;
-    return Math.max(0, Math.min(rows.length-1,
-      Math.floor((x-PAD_L)/(W-PAD_L-PAD_R)*rows.length)));
-  };
-  v.addEventListener("mousemove", e => {
-    const i = idxFromEvent(v,e), r = rows[i];
-    cross.setAttribute("x1",bandX(rows,i)); cross.setAttribute("x2",bandX(rows,i));
-    cross.setAttribute("visibility","visible");
-    show(e, `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
-      ${eur(r.market_value_in_eur)}${r.value_is_stale?" ⚠":""}`);
+/* ---------- game profile ---------- */
+const DIST = r => Math.hypot((1-r.location_x)*105, (r.location_y-.5)*68);
+const IN_BOX = r => r.location_x >= 1-16.5/105
+  && r.location_y >= .5-20.16/68 && r.location_y <= .5+20.16/68;
+
+/* ---------- xG band filter ---------- */
+const BANDS = [
+  {id:"a", lab:"≥ 0.80",     test:x=>x>=0.80},
+  {id:"b", lab:"0.50–0.79",  test:x=>x>=0.50 && x<0.80},
+  {id:"c", lab:"0.20–0.49",  test:x=>x>=0.20 && x<0.50},
+  {id:"d", lab:"< 0.20",     test:x=>x<0.20},
+];
+const selectedBands = new Set();   // empty = show all
+
+function drawBands(shotRows){
+  const el = document.getElementById("bandchips");
+  const n = shotRows.length;
+  el.innerHTML = BANDS.map(b => {
+    const c = shotRows.filter(r => b.test(r.xg)).length;
+    const on = selectedBands.has(b.id);
+    return `<button class="band" data-band="${b.id}" aria-pressed="${on}">
+      <span class="lab">xG ${b.lab}</span>
+      <span class="pc">${n?Math.round(100*c/n):0}% <span style="font-size:11px;color:var(--muted)">· ${c}</span></span>
+    </button>`;
+  }).join("");
+  const shown = selectedBands.size
+    ? shotRows.filter(r => BANDS.some(b => selectedBands.has(b.id) && b.test(r.xg)))
+    : shotRows;
+  drawPitch(shown, selectedBands.size > 0);
+}
+
+/* ---------- shot map ---------- */
+// Understat coords are normalised: location_x 1.0 = opponent goal line,
+// location_y 0.5 = centre. Drawn as a vertical attacking third, goal at top.
+const PITCH = {W:520, H:440, X0:0.55};   // show from 55% of pitch length up
+// Understat y<0.5 is the attacking team's RIGHT (a right-winger's shots sit
+// there); flip so the map reads from the attacker's view — their right on the
+// viewer's right. Everything else drawn is symmetric about y=0.5.
+const ppx = ly => 30 + (PITCH.W-60) * (1 - ly);
+// ~0.4% of shots come from deeper than the drawn area (halfway-line efforts);
+// pin them to the bottom edge so they stay countable instead of rendering
+// off-canvas, and mark them so the position isn't read as literal
+const ppy = lx => PITCH.H - 26 -
+  (PITCH.H-56) * Math.max(0, (lx - PITCH.X0)/(1 - PITCH.X0));
+const offMap = lx => lx < PITCH.X0;
+
+function drawPitch(sr, filtered){
+  const el = document.getElementById("pitch");
+  const L = (x1,y1,x2,y2) => `<line x1="${ppx(y1).toFixed(1)}" y1="${ppy(x1).toFixed(1)}"
+    x2="${ppx(y2).toFixed(1)}" y2="${ppy(x2).toFixed(1)}" stroke="var(--axis)"
+    stroke-opacity=".45" stroke-width="1.5"/>`;
+  // metric marks converted to Understat's normalised space (105m x 68m)
+  const boxX = 1-16.5/105, sixX = 1-5.5/105, spotX = 1-11/105;
+  const boxY0 = .5-20.16/68, boxY1 = .5+20.16/68;
+  const sixY0 = .5-9.16/68,  sixY1 = .5+9.16/68;
+  const goalY0 = .5-3.66/68, goalY1 = .5+3.66/68;
+  const lines = `
+    ${L(1,0,1,1)}${L(PITCH.X0,0,PITCH.X0,1)}${L(PITCH.X0,0,1,0)}${L(PITCH.X0,1,1,1)}
+    ${L(boxX,boxY0,boxX,boxY1)}${L(boxX,boxY0,1,boxY0)}${L(boxX,boxY1,1,boxY1)}
+    ${L(sixX,sixY0,sixX,sixY1)}${L(sixX,sixY0,1,sixY0)}${L(sixX,sixY1,1,sixY1)}
+    <line x1="${ppx(goalY0)}" y1="${ppy(1)-3}" x2="${ppx(goalY1)}" y2="${ppy(1)-3}"
+      stroke="var(--line)" stroke-opacity=".8" stroke-width="3"/>
+    <circle cx="${ppx(.5)}" cy="${ppy(spotX)}" r="2" fill="var(--axis)"/>`;
+
+  if(!sr.length){
+    el.innerHTML = `<svg viewBox="0 0 ${PITCH.W} ${PITCH.H}">${lines}
+      <text x="${PITCH.W/2}" y="${PITCH.H/2}" text-anchor="middle" font-size="13"
+        fill="var(--muted)">${filtered ? "no shots in the selected xG band(s)" : "no shots on record"}</text></svg>`;
+    document.getElementById("pitchcap").textContent = filtered
+      ? "No shots fall in the chosen xG band — clear a band to see the rest."
+      : "Understat records no shots here — keepers and unmatched players show empty.";
+    return;
+  }
+  // goals drawn last so they sit above the misses
+  const ordered = [...sr].sort((a,b) => (a.result==="Goal") - (b.result==="Goal"));
+  const dots = ordered.map(r => {
+    const goal = r.result === "Goal";
+    // area ~ xG, so a 0.4 chance looks twice a 0.1 rather than sixteen times
+    const rad = 3 + Math.sqrt(Math.max(r.xg,0)) * 13;
+    const off = offMap(r.location_x);
+    return `<circle data-i="${sr.indexOf(r)}" cx="${ppx(r.location_y).toFixed(1)}"
+      cy="${ppy(r.location_x).toFixed(1)}" r="${rad.toFixed(1)}"
+      fill="${goal ? "var(--amber)" : "rgba(242,245,239,.30)"}"
+      stroke="${goal ? "#20160a" : "rgba(242,245,239,.45)"}" stroke-width="${goal?1.5:1}"
+      ${off ? 'stroke-dasharray="2 2"' : ""}
+      ${goal?'':'fill-opacity=".75"'}/>`;
+  }).join("");
+  el.innerHTML = `<svg viewBox="0 0 ${PITCH.W} ${PITCH.H}" id="pitchsvg"
+     aria-label="Shot map: every shot with goals highlighted">${lines}${dots}</svg>`;
+
+  const goals = sr.filter(r => r.result === "Goal").length;
+  const xgSum = sr.reduce((a,r) => a+r.xg, 0);
+  const off = sr.filter(r => offMap(r.location_x)).length;
+  document.getElementById("pitchcap").innerHTML =
+    `${filtered?"<b>Filtered</b> · ":""}${sr.length} shots · ${goals} goals · ${xgSum.toFixed(1)} xG` +
+    (sr.length < MIN_SHOTS_MAP
+      ? ` — <span style="color:var(--chalk-y)">too few shots to read a pattern from
+         placement</span>.`
+      : `. Penalties sit on the spot.`) +
+    (off ? ` ${off} shot${off>1?"s":""} from deeper than the drawn area
+       ${off>1?"are":"is"} pinned to the bottom edge (dashed).` : "");
+
+  const svg = document.getElementById("pitchsvg");
+  svg.addEventListener("mousemove", e => {
+    const c = e.target.closest("circle[data-i]");
+    if(!c){ hideTip(); return; }
+    const r = sr[+c.dataset.i];
+    showTip(e, `<div class="t">${esc(r.date)} · ${esc(r.team)}</div>
+      ${esc(r.result)} · ${r.xg.toFixed(3)} xG<br>
+      ${esc(r.situation ?? "Penalty")} · ${esc(r.body_part ?? "?")} · ${r.minute}'`);
   });
-  v.addEventListener("mouseleave", () => { hide(); cross.setAttribute("visibility","hidden"); });
+  svg.addEventListener("mouseleave", hideTip);
+}
 
-  const xc = document.getElementById("xchart");
-  if(xc){
-    const xcross = document.getElementById("xcross");
-    xc.addEventListener("mousemove", e => {
-      const i = idxFromEvent(xc,e), r = rows[i];
-      xcross.setAttribute("x1",bandX(rows,i)); xcross.setAttribute("x2",bandX(rows,i));
-      xcross.setAttribute("visibility","visible");
-      const d = r.np_xg!=null ? (r.non_penalty_goals ?? 0) - r.np_xg : null;
-      show(e, `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
-        ${r.np_xg!=null
-          ? `${r.non_penalty_goals ?? 0} npG vs ${r.np_xg.toFixed(1)} npxG<br>
-             ${d>0?"+":""}${d.toFixed(1)} ${d>0?"over":"under"}performance`
-          : "no xG data this season"}`);
+/* ---------- radar (solo group-coloured, or multi-player overlay) ---------- */
+// build one player's slice list (percentile vs the SHARED pool, so axes mean
+// the same thing for everyone on the chart)
+function slicesFor(rowsForPlayer, pool){
+  const q = rates(rowsForPlayer);
+  if(!q) return null;
+  const out = [];
+  for(const g of GROUPS) for(const a of g.axes){
+    const raw = q[a.k];
+    const p = raw==null ? null : pctOf(pool.map(x=>x[a.k]).filter(v=>v!=null), raw);
+    out.push({...a, group:g.name, color:g.color, raw,
+              pct: p==null ? null : (a.inv ? 100-p : p)});
+  }
+  return out;
+}
+
+async function drawRadars(season){
+  const pz = document.getElementById("pizza");
+  const ax = document.getElementById("axlists");
+  const srow = techSrow();
+  const vs = vsList();
+  const compare = vs.length > 0;
+  // comparisons need a common basis → force career when overlaying
+  const rSeason = compare ? "career" : season;
+
+  let pool;
+  try{ pool = await peerPool(srow.league, srow.primary_position, rSeason); }
+  catch(e){ pz.innerHTML = `<p class="cap">Could not load the peer pool
+    (${esc(e.message)}).</p>`; return; }
+
+  // main player
+  const mainRows = rSeason === "career" ? techRows() : techRows().filter(r => r.season === rSeason);
+  const players = [{tm:mainTm(), name:srow.player_name, pos:srow.primary_position,
+                    color:SERIES[0], slices:slicesFor(mainRows, pool)}];
+  // comparison players (career), ranked against the SAME pool
+  for(let i=0;i<vs.length;i++){
+    let rs = []; try{ rs = await playerCareer(vs[i]); }catch{}
+    if(!rs.length) continue;
+    const sr = rs[rs.length-1];
+    players.push({tm:vs[i], name:sr.player_name, pos:sr.primary_position,
+      color:SERIES[i+1], slices:slicesFor(rs, pool)});
+  }
+  const valid = players.filter(p => p.slices);
+  if(!valid.length){ pz.innerHTML = `<p class="cap">No minutes in this selection.</p>`;
+    ax.innerHTML = ""; return; }
+
+  pz.innerHTML = profileRadar(valid, compare);
+
+  // legend + compare chips
+  document.getElementById("pzlegend").innerHTML = compare
+    ? valid.map(p => `<span class="i"><span class="swatch" style="background:${p.color}"></span>
+        ${esc(p.name)}</span>`).join("")
+    : `<span class="i"><span class="swatch" style="background:var(--amber)"></span>Attack</span>
+       <span class="i"><span class="swatch" style="background:var(--blue)"></span>Playmaking</span>
+       <span class="i"><span class="swatch" style="background:var(--green)"></span>Defence</span>`;
+  document.getElementById("cmpchips").innerHTML = valid.slice(1).map(p =>
+    `<span class="cmpchip" style="border-color:${p.color}">
+       <span class="swatch" style="background:${p.color}"></span>${esc(p.name)}
+       <button data-rmvs="${p.tm}" aria-label="remove">×</button></span>`).join("");
+
+  // axis list: solo = grouped w/ percentiles; compare = per-player columns
+  ax.innerHTML = compare
+    ? `<div class="axlist cmp nums" style="--np:${valid.length}"><div class="r head"><span></span>
+         ${valid.map(p => `<b style="color:${p.color}">${esc(p.name.split(" ").pop())}</b>`).join("")}</div>
+       ${GROUPS.flatMap(g => g.axes).map((a,i) => `<div class="r"><span>${esc(a.lab)}${a.inv?" ↓":""}</span>
+         ${valid.map(p => `<b>${p.slices[i].pct ?? "—"}</b>`).join("")}</div>`).join("")}</div>`
+    : GROUPS.map(g => {
+        const rs = valid[0].slices.filter(s => s.group === g.name);
+        return `<div class="axgroup">
+          <h3 style="color:${g.color}"><span class="swatch" style="background:${g.color}"></span>
+            ${esc(g.name)}</h3>
+          <div class="axlist nums">
+            ${rs.map(a => `<div class="r"><span>${esc(a.lab)}${a.inv?" ↓":""}</span>
+              <span class="raw">${a.raw==null?"—":a.fmt(a.raw)}</span>
+              <b style="color:${a.pct==null?"var(--muted)":g.color}">${a.pct ?? "—"}</b></div>`).join("")}
+          </div></div>`;
+      }).join("");
+
+}
+
+const HEX = {"var(--amber)":"#ffb43a", "var(--blue)":"#5aa9f0", "var(--green)":"#8fd18a",
+             "var(--chalk-y)":"#e8d47a", "var(--red)":"#e0524a"};
+
+// Radar. Solo: one group-coloured polygon over a grey peer-median backdrop.
+// Compare: each player a single-colour line polygon, no median (the overlay is
+// the reference). `players` = [{name,color,slices}], slices share the same axes.
+function profileRadar(players, compare){
+  window._players = players;
+  const S=480, cx=S/2, cy=S/2, R0=32, R1=146, N=players[0].slices.length;
+  const step = 2*Math.PI/N, gap = 0.03;
+  const ang = i => -Math.PI/2 + (i+0.5)*step;         // vertex sits mid-wedge
+  const rad = p => R0 + (R1-R0)*(p ?? 0)/100;
+  const at  = (i,p) => [cx + rad(p)*Math.cos(ang(i)), cy + rad(p)*Math.sin(ang(i))];
+  const ptAbs = (r,a) => `${(cx+r*Math.cos(a)).toFixed(1)} ${(cy+r*Math.sin(a)).toFixed(1)}`;
+  const hex = c => HEX[c] ?? c;
+  const slices = players[0].slices;   // axis definitions shared across players
+
+  let g = "";
+  for(const f of [.25,.5,.75,1])
+    g += `<circle cx="${cx}" cy="${cy}" r="${(R0+(R1-R0)*f).toFixed(1)}" fill="none"
+      stroke="var(--grid)" stroke-dasharray="${f===1?"none":"2 4"}"/>`;
+
+  // peer-median backdrop only in solo mode (in compare, the overlay is the reference)
+  if(!compare){
+    slices.forEach((s,i) => {
+      const a0 = -Math.PI/2 + i*step + gap, a1 = -Math.PI/2 + (i+1)*step - gap, r = rad(50);
+      g += `<path d="M ${ptAbs(R0,a0)} L ${ptAbs(r,a0)} A ${r} ${r} 0 0 1 ${ptAbs(r,a1)}
+        L ${ptAbs(R0,a1)} A ${R0} ${R0} 0 0 0 ${ptAbs(R0,a0)} Z"
+        fill="var(--line)" fill-opacity=".08"/>`;
     });
-    xc.addEventListener("mouseleave", () => {
-      hide(); xcross.setAttribute("visibility","hidden"); });
+    g += `<circle cx="${cx}" cy="${cy}" r="${rad(50).toFixed(1)}" fill="none"
+      stroke="var(--line)" stroke-opacity=".22" stroke-dasharray="1 5"/>`;
+  }
+  slices.forEach((s,i) => { const [x,y] = at(i,100);
+    g += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"
+      stroke="var(--grid)"/>`; });
+
+  const polyPts = sl => sl.map((s,i) => at(i,s.pct).map(v => v.toFixed(1)).join(",")).join(" ");
+
+  if(!compare){
+    // solo: group-coloured fans + group-coloured edges + group dots
+    const sl = slices;
+    g += `<polygon points="${polyPts(sl)}" fill="var(--line)" fill-opacity=".05"/>`;
+    for(const gr of [...new Set(sl.map(s => s.group))]){
+      const idx = sl.map((s,i) => ({s,i})).filter(o => o.s.group === gr).map(o => o.i);
+      const pts = [`${cx},${cy}`, ...idx.map(i => at(i,sl[i].pct).map(v => v.toFixed(1)).join(","))].join(" ");
+      g += `<polygon points="${pts}" fill="${hex(sl[idx[0]].color)}" fill-opacity=".20"/>`;
+    }
+    sl.forEach((s,i) => {
+      const j=(i+1)%N, [x1,y1]=at(i,s.pct), [x2,y2]=at(j,sl[j].pct);
+      const col = s.group===sl[j].group ? hex(s.color) : "rgba(242,245,239,.45)";
+      g += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}"
+        y2="${y2.toFixed(1)}" stroke="${col}" stroke-width="2.5" stroke-linecap="round"/>`;
+    });
+    sl.forEach((s,i) => { if(s.pct==null) return; const [x,y]=at(i,s.pct);
+      g += `<circle data-p="0" data-i="${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"
+        fill="${hex(s.color)}" stroke="var(--card)" stroke-width="1.5" style="cursor:default"/>`; });
+  }else{
+    // compare: one single-colour line polygon (light fill) per player
+    players.forEach((pl,pi) => {
+      const c = hex(pl.color);
+      g += `<polygon points="${polyPts(pl.slices)}" fill="${c}" fill-opacity=".08"
+        stroke="${c}" stroke-width="2.5" stroke-linejoin="round"/>`;
+      pl.slices.forEach((s,i) => { if(s.pct==null) return; const [x,y]=at(i,s.pct);
+        g += `<circle data-p="${pi}" data-i="${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5"
+          fill="${c}" stroke="var(--card)" stroke-width="1.5" style="cursor:default"/>`; });
+    });
   }
 
-  const t = document.getElementById("tchart"), tc = document.getElementById("tcross");
-  const tl = trendLines(m, typical);
-  t.addEventListener("mousemove", e => {
-    const i = idxFromEvent(t,e), r = rows[i];
-    tc.setAttribute("x1",bandX(rows,i)); tc.setAttribute("x2",bandX(rows,i));
-    tc.setAttribute("visibility","visible");
-    show(e, `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
-      ${tl.map(([key,,lab,fmt])=>`${fmt(asGetter(key)(r))} ${esc(lab)}`).join(" · ")}`);
+  // labels (shared axes)
+  slices.forEach((s,i) => {
+    const a = ang(i), deg = a*180/Math.PI, flip = deg>90 || deg<-90;
+    const lr = R1+26, lx = cx+lr*Math.cos(a), ly = cy+lr*Math.sin(a);
+    g += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}"
+      text-anchor="${flip?"end":"start"}" dominant-baseline="middle" font-size="10.5"
+      transform="rotate(${(flip?deg+180:deg).toFixed(1)} ${lx.toFixed(1)} ${ly.toFixed(1)})"
+      fill="var(--line)" fill-opacity=".85">${esc(s.lab.replace(" /90",""))}${s.inv?" ↓":""}</text>`;
   });
-  t.addEventListener("mouseleave", () => { hide(); tc.setAttribute("visibility","hidden"); });
+  g += `<circle cx="${cx}" cy="${cy}" r="${(R0-6).toFixed(1)}" fill="var(--card)"
+    stroke="var(--border)"/>`;
+  return `<svg viewBox="0 0 ${S} ${S}" id="pizzasvg" aria-label="Player profile radar"
+     onmousemove="pizzaHover(event)" onmouseleave="hidePizza()">${g}</svg>`;
 }
+// hover survives innerHTML swaps
+window.pizzaHover = e => {
+  const d = e.target.closest("circle[data-i]");
+  if(!d){ hideTip(); return; }
+  const pl = window._players?.[+d.dataset.p];
+  const s = pl?.slices[+d.dataset.i];
+  if(s) showTip(e, `<div class="t">${esc(pl.name)} · ${esc(s.group)}</div>
+    ${esc(s.lab)}${s.inv?" ↓":""}: <b>${s.raw==null?"—":s.fmt(s.raw)}</b>
+    · ${s.pct ?? "—"}th pct`);
+};
+window.hidePizza = () => hideTip();
 </script>
 </body>
 </html>
