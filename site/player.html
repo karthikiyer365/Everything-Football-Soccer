@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Player Dashboard — SoccerHub</title>
+<title>Player Dashboard — SportSignal</title>
 <meta name="description" content="One page per player: technical profile, value vs output, and career trend, ranked against positional peers.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
 <style>
   /* merged :root — player.html had no --red although player.html:460 used it */
   :root{
-    --grass:#122b1a; --grass-lt:#16321f; --card:#0a1a0e;
-    --line:#f2f5ef; --muted:#9fb69c; --tag:#8fae8b; --border:rgba(242,245,239,.22);
+    --grass:#122b1a; --grass-lt:#16321f; --card:#0f4a36;
+    --line:#f2f5ef; --muted:#c6d6ce; --tag:#86b39b; --border:rgba(242,245,239,.20);
     --amber:#ffb43a; --green:#8fd18a; --chalk-y:#e8d47a; --blue:#5aa9f0;
-    --red:#e0524a; --grid:rgba(242,245,239,.10); --axis:rgba(242,245,239,.35);
+    --red:#f07d73; --grid:rgba(242,245,239,.12); --axis:rgba(242,245,239,.40);
   }
   *{box-sizing:border-box}
   html,body{margin:0}
@@ -50,9 +50,9 @@
 
   /* ---------- hero strip (flattened .pcard) ---------- */
   .herostrip{border-radius:14px;padding:18px 24px;
-        background:linear-gradient(160deg,#2a4d2f 0%,#17331e 55%,#0e2413 100%);
-        border:1px solid rgba(255,180,58,.55);
-        box-shadow:0 18px 50px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
+        background:linear-gradient(160deg,#17624a 0%,#12543e 55%,#0e4634 100%);
+        border:1px solid rgba(255,180,58,.45);
+        box-shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 24px rgba(16,24,40,.06);
         display:flex;align-items:center;gap:26px;flex-wrap:wrap}
   .rating{text-align:center;min-width:74px}
   .rating b{display:block;font-size:46px;line-height:.9;color:var(--amber)}
@@ -105,7 +105,7 @@
   .chartbox{position:relative}
   .chartbox svg{width:100%;height:auto;display:block}
   svg text{font:10px system-ui;fill:var(--axis)}
-  #tip{position:fixed;z-index:9;pointer-events:none;display:none;background:#050e08;
+  #tip{position:fixed;z-index:9;pointer-events:none;display:none;background:#10221a;
        border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-size:.8rem;
        color:var(--line);box-shadow:0 4px 16px rgba(0,0,0,.5);max-width:230px}
   #tip .t{color:var(--tag);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
@@ -124,7 +124,7 @@
   .cardrow .dots{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
   .cardrow .yc,.cardrow .rc{width:9px;height:12px;border-radius:2px;display:inline-block}
   .cardrow .yc{background:#f5c542}
-  .cardrow .rc{background:#e0524a}
+  .cardrow .rc{background:#f07d73}
   .cardrow .rate{color:var(--muted);margin-left:8px}
   /* the tab holds two scopes; the label says which one you are reading */
   .scopelabel{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--tag);
@@ -231,11 +231,59 @@
   #ask-out th{color:var(--muted);font-weight:600;font-size:.75rem;text-transform:uppercase}
   #ask-out td:first-child,#ask-out th:first-child{padding-left:0}
   #ask-out strong{color:var(--amber);font-weight:600}
+
+  /* ================= light shell — matches index.html =================
+     Page chrome only: background, nav, search, chips, tabs and the text
+     that sits directly on the page. The analysis panels keep the dark
+     palette until their charts are tokenised, so dark cards sit on a
+     white page by design, not by omission. */
+  :root{
+    --shell-bg:#ffffff; --shell-ink:#0f1720; --shell-soft:#5b6875;
+    --shell-kick:#7b8894; --shell-rule:#e7ebee; --shell-field:#f4f6f8;
+    --shell-accent:#0e9f6e; --shell-accent-deep:#0b7c56;
+  }
+  body{background:var(--shell-bg);color:var(--shell-ink);
+       font-family:"Inter","Helvetica Neue",system-ui,-apple-system,sans-serif}
+  a{color:var(--shell-accent-deep)}
+  .top{background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
+       border-bottom:1px solid var(--shell-rule)}
+  /* the wordmark picks up index.html's green dot */
+  .top a.home{color:var(--shell-ink);font-family:inherit;font-weight:750;
+       letter-spacing:-.02em;text-transform:none;font-stretch:normal;
+       display:inline-flex;align-items:center;gap:9px}
+  .top a.home::before{content:"";width:13px;height:13px;border-radius:50%;
+       background:var(--shell-accent);display:inline-block}
+  .empty{color:var(--shell-soft)}
+  .empty .disp{color:var(--shell-ink)}
+  .chips button{background:#fff;border-color:var(--shell-rule);color:var(--shell-soft)}
+  .chips button[aria-pressed="true"]{background:var(--shell-accent-deep);
+       border-color:var(--shell-accent-deep);color:#fff;font-weight:700}
+  .chips button:focus-visible{outline-color:var(--shell-accent)}
+  #search{background:var(--shell-field);color:var(--shell-ink);border-color:var(--shell-rule)}
+  #search::placeholder{color:var(--shell-kick)}
+  #search:focus-visible{outline-color:var(--shell-accent)}
+  #results{background:#fff;border-color:var(--shell-rule);
+       box-shadow:0 8px 24px rgba(16,24,40,.08)}
+  #results button{color:var(--shell-ink)}
+  #results button:hover,#results button:focus-visible{background:#f1f8f4}
+  #results .sub{color:var(--shell-kick)}
+  .tabs{border-bottom-color:var(--shell-rule)}
+  .tabs button{color:var(--shell-soft)}
+  .tabs button[aria-selected="true"]{background:var(--shell-accent-deep);color:#fff}
+  .tabs button:focus-visible{outline-color:var(--shell-accent)}
+  .cardnote{color:var(--shell-soft)}
+  /* section labels in the Value tab sit on the page, not in a card */
+  .scopelabel{color:var(--shell-kick);border-top-color:var(--shell-rule)}
+  .scopelabel span{color:var(--shell-soft)}
+  /* panels set their own text colour: body{color} is the light shell's ink,
+     and anything unstyled inside a dark panel would inherit it */
+  .herostrip,.box,details.season-log,#tip{color:var(--line)}
+  .idbox h1{color:#fff}
 </style>
 </head>
 <body>
 <nav class="top">
-  <a class="home disp" href="index.html">⚽ SoccerHub</a>
+  <a class="home disp" href="index.html">SportSignal</a>
   <div class="searchwrap">
     <input id="search" type="search" placeholder="Search any player, 2008–2025…"
            autocomplete="off" aria-label="Search player">
@@ -648,7 +696,7 @@ function gameLine(c, allShots){
 function render(){
   const c = careerModel();
   const last = c.last;
-  document.title = `${last.player_name} — SoccerHub`;
+  document.title = `${last.player_name} — SportSignal`;
 
   const s = sel(), best = bestSeason();
   const chip = (val, label, pressed) =>
@@ -1697,8 +1745,9 @@ async function drawRadars(season){
 
 }
 
+// mirrors :root — SVG fills are built in strings, so they cannot use var()
 const HEX = {"var(--amber)":"#ffb43a", "var(--blue)":"#5aa9f0", "var(--green)":"#8fd18a",
-             "var(--chalk-y)":"#e8d47a", "var(--red)":"#e0524a"};
+             "var(--chalk-y)":"#e8d47a", "var(--red)":"#f07d73"};
 
 // Radar. Solo: one group-coloured polygon over a grey peer-median backdrop.
 // Compare: each player a single-colour line polygon, no median (the overlay is

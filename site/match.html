@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Match Center — SoccerHub</title>
+<title>Match Center — SportSignal</title>
 <meta name="description" content="The round-by-round race and long-run club strength across Europe's big five leagues, 2008 to today.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
 <style>
   :root{
-    --grass:#122b1a; --grass-lt:#16321f; --card:#0a1a0e;
-    --line:#f2f5ef; --muted:#9fb69c; --tag:#8fae8b; --border:rgba(242,245,239,.22);
+    --grass:#122b1a; --grass-lt:#16321f; --card:#0f4a36;
+    --line:#f2f5ef; --muted:#c6d6ce; --tag:#86b39b; --border:rgba(242,245,239,.20);
     --amber:#ffb43a; --green:#8fd18a; --chalk-y:#e8d47a; --blue:#5aa9f0;
-    --red:#e0524a; --grid:rgba(242,245,239,.10); --axis:rgba(242,245,239,.35);
+    --red:#f07d73; --grid:rgba(242,245,239,.12); --axis:rgba(242,245,239,.40);
   }
   *{box-sizing:border-box}
   html,body{margin:0}
@@ -76,15 +76,53 @@
   .statcard .t{font-weight:700;font-size:.9rem}
   .statcard .l{color:var(--muted)}
 
-  #tip{position:fixed;z-index:9;pointer-events:none;display:none;background:#050e08;
+  #tip{position:fixed;z-index:9;pointer-events:none;display:none;background:#10221a;
        border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-size:.8rem;
        color:var(--line);box-shadow:0 4px 16px rgba(0,0,0,.5)}
   #tip .t{color:var(--tag);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
+
+  /* ================= light shell — matches index.html =================
+     Page chrome only: background, nav, search, chips, tabs and the text
+     that sits directly on the page. The analysis panels keep the dark
+     palette until their charts are tokenised, so dark cards sit on a
+     white page by design, not by omission. */
+  :root{
+    --shell-bg:#ffffff; --shell-ink:#0f1720; --shell-soft:#5b6875;
+    --shell-kick:#7b8894; --shell-rule:#e7ebee; --shell-field:#f4f6f8;
+    --shell-accent:#0e9f6e; --shell-accent-deep:#0b7c56;
+  }
+  body{background:var(--shell-bg);color:var(--shell-ink);
+       font-family:"Inter","Helvetica Neue",system-ui,-apple-system,sans-serif}
+  a{color:var(--shell-accent-deep)}
+  .top{background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
+       border-bottom:1px solid var(--shell-rule)}
+  /* the wordmark picks up index.html's green dot */
+  .top a.home{color:var(--shell-ink);font-family:inherit;font-weight:750;
+       letter-spacing:-.02em;text-transform:none;font-stretch:normal;
+       display:inline-flex;align-items:center;gap:9px}
+  .top a.home::before{content:"";width:13px;height:13px;border-radius:50%;
+       background:var(--shell-accent);display:inline-block}
+  .empty{color:var(--shell-soft)}
+  .empty .disp{color:var(--shell-ink)}
+  .chips button{background:#fff;border-color:var(--shell-rule);color:var(--shell-soft)}
+  .chips button[aria-pressed="true"]{background:var(--shell-accent-deep);
+       border-color:var(--shell-accent-deep);color:#fff;font-weight:700}
+  .chips button:focus-visible{outline-color:var(--shell-accent)}
+  .top h1{color:var(--shell-soft)}
+  #teamsearch{background:var(--shell-field);color:var(--shell-ink);border-color:var(--shell-rule)}
+  #teamsearch::placeholder{color:var(--shell-kick)}
+  #teamsearch:focus-visible{outline-color:var(--shell-accent)}
+  #teamlist{background:#fff;border-color:var(--shell-rule);
+       box-shadow:0 8px 24px rgba(16,24,40,.08)}
+  #teamlist button{color:var(--shell-ink)}
+  #teamlist button:hover,#teamlist button:focus-visible{background:#f1f8f4}
+  #teamlist button[disabled]{color:var(--shell-kick)}
+  .box,details.season-log,#tip{color:var(--line)}
 </style>
 </head>
 <body>
 <nav class="top">
-  <a class="home disp" href="index.html">⚽ SoccerHub</a>
+  <a class="home disp" href="index.html">SportSignal</a>
   <h1>Match Center</h1>
 </nav>
 
