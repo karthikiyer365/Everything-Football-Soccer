@@ -3,165 +3,203 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SoccerHub — every number on the pitch</title>
-<meta name="description" content="Open football analytics: 18 seasons of Europe's big five leagues — player stats, market values and transfers, cross-matched into one database.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<title>SportSignal — sports analytics</title>
+<meta name="description" content="Shot maps, peer percentiles and market value against the age curve — eighteen seasons of Europe's big five leagues, cross-matched into one open database.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%230e9f6e'/></svg>">
+<link rel="stylesheet" href="theme.css">
 <style>
-  :root{
-    --grass:#122b1a; --grass-lt:#16321f;
-    --line:#f2f5ef; --amber:#ffb43a; --ink:#14231a;
-    --chalk-y:#e8d47a; --muted:#9fb69c; --tag:#8fae8b;
+  .disp{letter-spacing:-.025em;font-weight:750;line-height:1.05}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 28px}
+
+  /* ---------- nav ---------- */
+  .nav{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.92);
+       backdrop-filter:blur(8px);border-bottom:1px solid var(--rule)}
+  .nav .wrap{display:flex;gap:16px;align-items:center;padding-top:14px;padding-bottom:14px}
+  .brand{display:flex;align-items:center;gap:9px;font-size:19px;font-weight:750;letter-spacing:-.02em}
+  .brand i{width:13px;height:13px;border-radius:50%;background:var(--accent);display:inline-block}
+  .sports{display:flex;gap:2px;margin-left:10px}
+  .sports button{border:0;background:none;font:inherit;font-size:13.5px;color:var(--soft);
+       padding:6px 14px;border-radius:999px;cursor:pointer}
+  .sports button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);font-weight:650}
+  .sports button[disabled]{opacity:.4;cursor:not-allowed}
+  .srch{width:260px;padding:9px 15px;border-radius:999px;border:1px solid var(--rule);
+       background:var(--field);color:var(--ink);font:inherit;font-size:13.5px;margin:0}
+  .srch::placeholder{color:var(--kick)}
+  .btn{display:inline-block;padding:12px 22px;border-radius:999px;background:var(--accent);
+       color:var(--on-accent);font-weight:650;font-size:14.5px;box-shadow:var(--shadow-sm)}
+  .btn.ghost{background:none;border:1px solid var(--rule);color:var(--ink);font-weight:550;box-shadow:none}
+
+  /* ---------- hero ---------- */
+  .hero{padding:66px 0 54px}
+  .hero .wrap{display:grid;grid-template-columns:1.15fr 1fr;gap:52px;align-items:center}
+  .kicker{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--kick);margin:0 0 14px}
+  .hero h1{font-size:54px;margin:0 0 16px}
+  .hero p.dek{font-size:17.5px;color:var(--soft);margin:0 0 26px;max-width:50ch}
+  .cta{display:flex;gap:10px;flex-wrap:wrap}
+  .chartcard{background:var(--panel);border:1px solid var(--rule);border-radius:16px;
+       padding:22px;box-shadow:var(--shadow);margin:0}
+  .chartcard figcaption{margin-top:14px;font-size:12.5px;color:var(--soft)}
+
+  .spark path.l{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linecap:round;
+       stroke-linejoin:round;stroke-dasharray:1000;stroke-dashoffset:1000;
+       animation:draw 2.2s cubic-bezier(.4,0,.2,1) forwards}
+  .spark path.a{fill:var(--accent);opacity:.09}
+  .spark rect{fill:#d3efe3;animation:rise .7s cubic-bezier(.2,.8,.2,1) backwards;
+       transform-box:fill-box;transform-origin:50% 100%}
+  .spark circle.run{fill:var(--amber-fill);stroke:#fff;stroke-width:2}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  @keyframes rise{from{transform:scaleY(0)}}
+  @media(prefers-reduced-motion:reduce){
+    .spark path.l{animation:none;stroke-dashoffset:0}
+    .spark rect{animation:none}
+    .spark circle.run{display:none}
   }
-  *{box-sizing:border-box}
-  html,body{margin:0}
-  body{background:var(--grass);color:var(--line);
-       font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
-  .disp{font-family:"Avenir Next Condensed","Arial Narrow","Helvetica Neue Condensed",Impact,sans-serif;
-        text-transform:uppercase;letter-spacing:.04em;font-stretch:condensed}
-  .nums{font-variant-numeric:tabular-nums}
 
-  .pitch{position:relative;min-height:100vh;overflow:hidden;
-      background:
-      radial-gradient(900px 340px at 50% -60px, rgba(220,236,255,.10), transparent 70%),
-      repeating-linear-gradient(0deg,var(--grass) 0 72px,var(--grass-lt) 72px 144px)}
-  .pitch svg.lines,.pitch svg.ballsvg{position:absolute;inset:0;width:100%;height:100%}
-  .pitch svg.ballsvg{pointer-events:none}
-  @media (prefers-reduced-motion: reduce){ .pitch svg.ballsvg{display:none} }
+  /* ---------- stat band ---------- */
+  .band{background:var(--band);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+  .band .wrap{display:flex;gap:56px;flex-wrap:wrap;padding-top:26px;padding-bottom:26px}
+  .band b{display:block;font-size:27px;font-weight:700;letter-spacing:-.02em}
+  .band span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--soft)}
+  .band .note{margin-left:auto;align-self:center;max-width:34ch;font-size:13px;color:var(--soft)}
 
-  header.head{position:relative;text-align:center;padding:52px 16px 0}
-  .head h1{font-size:clamp(2.2rem,6vw,3.8rem);margin:0;line-height:1;
-           text-shadow:0 2px 0 rgba(0,0,0,.45)}
-  .head p{margin:12px auto 0;max-width:52ch;color:var(--muted)}
-  .kick{display:inline-block;margin-top:20px;padding:12px 36px;border-radius:999px;
-        font-weight:700;text-decoration:none;letter-spacing:.06em;
-        text-transform:uppercase;font-size:.85rem;background:var(--amber);color:#20160a}
-  .kick:hover{background:#ffc76b}
-  .kick:focus-visible{outline:3px solid var(--line);outline-offset:2px}
+  /* ---------- surfaces ---------- */
+  .surfaces{padding:56px 0 70px}
+  .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin-top:22px}
+  .card{display:block;background:var(--panel);border:1px solid var(--rule);border-radius:16px;
+       padding:22px;box-shadow:var(--shadow);transition:transform .16s ease, box-shadow .16s ease}
+  a.card:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(16,24,40,.05), 0 14px 32px rgba(16,24,40,.09)}
+  /* not a link: no lift, no arrow — an unbuilt surface should not look clickable */
+  .card.soon{box-shadow:none;background:var(--band)}
+  .card h3{margin:12px 0 6px;font-size:17px;letter-spacing:-.015em}
+  .card p{margin:0;font-size:13.5px;color:var(--soft);line-height:1.5}
+  .pill{display:inline-block;padding:4px 10px;border-radius:999px;font-size:10px;letter-spacing:.1em;
+       text-transform:uppercase;font-weight:700;background:var(--live-bg);color:var(--live)}
+  .pill.wip{background:var(--soon-bg);color:var(--soft);font-weight:600}
+  .card .more{margin-top:14px;font-size:13px;color:var(--accent-deep);font-weight:650}
 
-  .formation{position:relative;display:grid;gap:20px;
-             grid-template-columns:repeat(3,minmax(0,1fr));
-             max-width:980px;margin:52px auto 0;padding:0 28px 110px}
-  .row-tag{grid-column:1/-1;font-size:.72rem;letter-spacing:.2em;
-           text-transform:uppercase;color:var(--tag);margin-top:6px}
-  a.pos,article.pos{display:block;border-radius:4px;padding:18px 18px 14px;
-      background:rgba(5,14,8,.78);border:1px solid rgba(242,245,239,.22);
-      backdrop-filter:blur(2px);color:inherit;text-decoration:none}
-  .pos .shirt{display:flex;align-items:baseline;gap:10px}
-  .pos .no{font-size:1.9rem;font-weight:700;line-height:1;color:var(--amber)}
-  .pos h2{margin:0;font-size:1.05rem;letter-spacing:.05em}
-  .pos p{margin:8px 0 0;font-size:.86rem;line-height:1.45;color:var(--muted)}
-  .pos .stat{margin-top:10px;font-size:.78rem;letter-spacing:.08em;
-             text-transform:uppercase;color:var(--chalk-y)}
-  .pos.soon{opacity:.55;border-style:dashed}
-  a.pos:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
-  @media (prefers-reduced-motion: no-preference){
-    .pos{transition:transform .18s ease,border-color .18s ease}
-    a.pos:hover{transform:translateY(-3px);border-color:var(--amber)}
+  footer{border-top:1px solid var(--rule);background:var(--band)}
+  footer .wrap{padding-top:30px;padding-bottom:36px;font-size:13px;color:var(--soft)}
+  footer a{color:var(--accent-deep);font-weight:600}
+
+  @media(max-width:1000px){
+    .hero .wrap{grid-template-columns:1fr;gap:34px}
+    .hero h1{font-size:40px}
+    .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .srch{display:none}
   }
-  @media(max-width:720px){.formation{grid-template-columns:1fr 1fr}}
-  @media(max-width:480px){.formation{grid-template-columns:1fr}}
-
-  footer{position:relative;text-align:center;padding:0 16px 34px;
-         font-size:.8rem;color:var(--tag)}
-  footer a{color:var(--chalk-y)}
+  @media(max-width:560px){ .grid{grid-template-columns:1fr} .band .wrap{gap:28px} }
 </style>
 </head>
 <body>
-<main class="pitch">
-  <svg class="lines" viewBox="0 0 1000 960" preserveAspectRatio="none" aria-hidden="true">
-    <g fill="none" stroke="#f2f5ef" stroke-opacity=".28" stroke-width="3">
-      <rect x="30" y="30" width="940" height="900"/>
-      <line x1="30" y1="480" x2="970" y2="480"/>
-      <circle cx="500" cy="480" r="90"/>
-      <rect x="290" y="30" width="420" height="130"/>
-      <rect x="290" y="800" width="420" height="130"/>
-      <rect x="400" y="30" width="200" height="55"/>
-      <rect x="400" y="875" width="200" height="55"/>
-    </g>
-  </svg>
-  <svg class="ballsvg" viewBox="0 0 1000 960" preserveAspectRatio="none" aria-hidden="true">
-    <path id="pass" fill="none" stroke="var(--amber)" stroke-opacity=".35"
-          stroke-width="2.5" stroke-dasharray="4 10"
-          d="M 500 900 C 300 780 220 640 260 540 C 300 440 460 470 500 480
-             C 560 490 700 460 730 380 C 760 300 620 260 500 300
-             C 380 340 300 300 330 220"/>
-    <circle r="9" fill="var(--line)">
-      <animateMotion dur="14s" repeatCount="indefinite" rotate="none">
-        <mpath href="#pass"/>
-      </animateMotion>
-    </circle>
-    <circle r="4" fill="var(--ink)">
-      <animateMotion dur="14s" repeatCount="indefinite" rotate="none">
-        <mpath href="#pass"/>
-      </animateMotion>
-    </circle>
-  </svg>
 
-  <header class="head">
-    <h1 class="disp">Every number on the pitch</h1>
-    <p>Eighteen seasons of Europe's big five leagues — stats, market values and
-       transfers, cross-matched into one open database. Pick a position to start.</p>
-    <a class="kick" href="player.html">Kick off</a>
-  </header>
+<nav class="nav">
+  <div class="wrap">
+    <span class="brand"><i></i>SportSignal</span>
+    <div class="sports" role="group" aria-label="Sport">
+      <button aria-pressed="true">Soccer</button>
+      <button disabled title="Data in progress">Basketball</button>
+      <button disabled title="Data in progress">Football</button>
+      <button disabled title="Data in progress">Cricket</button>
+    </div>
+    <form style="margin-left:auto" action="player.html" method="get">
+      <input class="srch" type="search" name="name" placeholder="Search any player…"
+             aria-label="Search any player">
+    </form>
+  </div>
+</nav>
 
-  <nav class="formation" aria-label="Dashboards">
-    <div class="row-tag">Front three — player surfaces</div>
-    <a class="pos" href="player.html">
-      <div class="shirt"><span class="no nums">9</span><h2 class="disp">Player Dashboard</h2></div>
-      <p>A career on one page: goals, minutes and market value season by season, across leagues.</p>
-      <div class="stat nums">49,692 player-seasons</div>
-    </a>
-    <article class="pos soon">
-      <div class="shirt"><span class="no nums">7</span><h2 class="disp">Scouting Screens</h2></div>
-      <p>Moneyball filters: under-21, high output per 90, priced under the market.</p>
-      <div class="stat">In training</div>
-    </article>
-    <article class="pos soon">
-      <div class="shirt"><span class="no nums">11</span><h2 class="disp">Value vs Output</h2></div>
-      <p>Who out-produced their price tag — and who never repaid it.</p>
-      <div class="stat">In training</div>
-    </article>
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <p class="kicker">Soccer · Europe's big five · 2008&ndash;2025</p>
+      <h1 class="disp">Every number, one page per player</h1>
+      <p class="dek">Shot maps, peer percentiles and market value against the age curve —
+        eighteen seasons cross-matched into one open database.</p>
+      <div class="cta">
+        <a class="btn" href="player.html">Open the dashboard</a>
+        <a class="btn ghost" href="match.html">Match Center</a>
+      </div>
+    </div>
 
-    <div class="row-tag">Midfield — market surfaces</div>
-    <article class="pos soon">
-      <div class="shirt"><span class="no nums">8</span><h2 class="disp">Transfer Market</h2></div>
-      <p>Fees, moves and windows; follow a player across clubs and leagues.</p>
-      <div class="stat nums">35,123 transfers · in training</div>
-    </article>
-    <article class="pos soon">
-      <div class="shirt"><span class="no nums">6</span><h2 class="disp">League Inflation</h2></div>
-      <p>Median squad value 2008 → 2025: how fast each league's money grew.</p>
-      <div class="stat">In training</div>
-    </article>
-    <article class="pos soon">
-      <div class="shirt"><span class="no nums">10</span><h2 class="disp">Age Curves</h2></div>
-      <p>When strikers peak, when keepers fade — every position's arc.</p>
-      <div class="stat">In training</div>
-    </article>
+    <figure class="chartcard">
+      <svg class="spark" viewBox="0 0 420 200" style="width:100%;height:auto;display:block"
+           aria-label="Non-penalty goals against the expected goals those chances were worth, by season">
+        <rect x="18"  y="126" width="30" height="58"  rx="4" style="animation-delay:.05s"/>
+        <rect x="66"  y="104" width="30" height="80"  rx="4" style="animation-delay:.12s"/>
+        <rect x="114" y="118" width="30" height="66"  rx="4" style="animation-delay:.19s"/>
+        <rect x="162" y="80"  width="30" height="104" rx="4" style="animation-delay:.26s"/>
+        <rect x="210" y="58"  width="30" height="126" rx="4" style="animation-delay:.33s"/>
+        <rect x="258" y="92"  width="30" height="92"  rx="4" style="animation-delay:.40s"/>
+        <rect x="306" y="66"  width="30" height="118" rx="4" style="animation-delay:.47s"/>
+        <rect x="354" y="46"  width="30" height="138" rx="4" style="animation-delay:.54s"/>
+        <path class="a" d="M33 112 L81 92 L129 100 L177 66 L225 44 L273 74 L321 52 L369 30 L369 184 L33 184 Z"/>
+        <path class="l" id="spk" d="M33 112 L81 92 L129 100 L177 66 L225 44 L273 74 L321 52 L369 30"/>
+        <circle class="run" r="5.5">
+          <animateMotion dur="2.2s" fill="freeze" begin="0s"><mpath href="#spk"/></animateMotion>
+        </circle>
+      </svg>
+      <figcaption>Non-penalty goals (bars) against the expected goals those chances were
+        worth (line). The gap is the finishing.</figcaption>
+    </figure>
+  </div>
+</section>
 
-    <div class="row-tag">Back line — coming windows</div>
-    <a class="pos" href="match.html">
-      <div class="shirt"><span class="no nums">4</span><h2 class="disp">Match Center</h2></div>
-      <p>Standings, results, form and club Elo — every matchday since 2008.</p>
-      <div class="stat nums">32,545 matches</div>
-    </a>
-    <a class="pos" href="player.html?tab=technical">
-      <div class="shirt"><span class="no nums">5</span><h2 class="disp">Technical Profile</h2></div>
-      <p>Every shot on a pitch map, plus attack, playmaking and defence ranked against peers.</p>
-      <div class="stat nums">542,481 shots</div>
-    </a>
-    <article class="pos soon">
-      <div class="shirt"><span class="no nums">3</span><h2 class="disp">xG Studio</h2></div>
-      <p>Expected goals vs the real thing.</p>
-      <div class="stat">Next window</div>
-    </article>
-  </nav>
+<section class="band">
+  <div class="wrap nums">
+    <div><b>49,692</b><span>Player-seasons</span></div>
+    <div><b>542,481</b><span>Shots</span></div>
+    <div><b>32,545</b><span>Matches</span></div>
+    <div><b>18</b><span>Seasons</span></div>
+    <p class="note">FBref, StatsBomb, Understat and Transfermarkt, cross-matched and
+       refreshed twice weekly.</p>
+  </div>
+</section>
 
-  <footer>
-    Data: FBref · StatsBomb open data · Transfermarkt (via
+<section class="surfaces">
+  <div class="wrap">
+    <p class="kicker" style="margin-bottom:6px">Analysis surfaces</p>
+    <h2 class="disp" style="font-size:26px;margin:0">Soccer</h2>
+    <div class="grid">
+
+      <a class="card" href="player.html">
+        <span class="pill">Live</span>
+        <h3>Player Analysis</h3>
+        <p>Technical profile, price against output, and the whole career on one page —
+           plus an AI analyst over the data.</p>
+        <div class="more">Open &rarr;</div>
+      </a>
+
+      <a class="card" href="match.html">
+        <span class="pill">Live</span>
+        <h3>Match Center</h3>
+        <p>Standings, results, form and club Elo for every matchday since 2008.</p>
+        <div class="more">Open &rarr;</div>
+      </a>
+
+      <div class="card soon">
+        <span class="pill wip">In progress</span>
+        <h3>Team Analysis</h3>
+        <p>Squad value, style and shape, season by season, against the rest of the league.</p>
+      </div>
+
+      <div class="card soon">
+        <span class="pill wip">In progress</span>
+        <h3>Scouting Screens</h3>
+        <p>Moneyball filters: under-21, high output per 90, priced under the market.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    Data: FBref · StatsBomb open data · Understat · Transfermarkt (via
     <a href="https://github.com/dcaribou/transfermarkt-datasets">transfermarkt-datasets</a>)
     — refreshed twice weekly.
-  </footer>
-</main>
+  </div>
+</footer>
+
 </body>
 </html>

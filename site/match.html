@@ -3,47 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Match Center — SoccerHub</title>
+<title>Match Center — SportSignal</title>
 <meta name="description" content="The round-by-round race and long-run club strength across Europe's big five leagues, 2008 to today.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<link rel="stylesheet" href="theme.css">
 <style>
-  :root{
-    --grass:#122b1a; --grass-lt:#16321f; --card:#0a1a0e;
-    --line:#f2f5ef; --muted:#9fb69c; --tag:#8fae8b; --border:rgba(242,245,239,.22);
-    --amber:#ffb43a; --green:#8fd18a; --chalk-y:#e8d47a; --blue:#5aa9f0;
-    --red:#e0524a; --grid:rgba(242,245,239,.10); --axis:rgba(242,245,239,.35);
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0}
-  body{background:
-       repeating-linear-gradient(0deg,var(--grass) 0 72px,var(--grass-lt) 72px 144px);
-       color:var(--line);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
-       min-height:100vh}
   .disp{font-family:"Avenir Next Condensed","Arial Narrow","Helvetica Neue Condensed",Impact,sans-serif;
         text-transform:uppercase;letter-spacing:.04em;font-stretch:condensed}
-  .nums{font-variant-numeric:tabular-nums}
-  a{color:var(--chalk-y)}
 
-  .top{position:sticky;top:0;z-index:5;display:flex;gap:16px;align-items:center;
-       padding:12px 20px;background:rgba(5,14,8,.92);backdrop-filter:blur(4px);
-       border-bottom:1px solid var(--border)}
-  .top a.home{color:var(--line);text-decoration:none;font-size:1.05rem;white-space:nowrap}
   .top h1{margin:0;font-size:1.05rem;color:var(--muted);font-weight:400}
 
   main{max-width:1060px;margin:0 auto;padding:24px 20px 80px}
-  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
-  .chips button{border:1px solid var(--border);background:var(--card);color:var(--muted);
-       border-radius:999px;padding:4px 12px;font:inherit;font-size:.8rem;cursor:pointer}
-  .chips button[aria-pressed="true"]{background:var(--amber);color:#20160a;
-       border-color:var(--amber);font-weight:700}
-  .chips button:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+
+  .chips{margin:0 0 10px}
 
   /* team picker */
   .picker{position:relative;margin:6px 0 0}
   .picker .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  #teamsearch{width:260px;padding:8px 14px;border-radius:999px;border:1px solid var(--border);
-       background:var(--card);color:var(--line);font:inherit;font-size:.9rem}
-  #teamsearch::placeholder{color:var(--tag)}
+  #teamsearch{width:260px;padding:8px 14px;border-radius:999px;border:1px solid var(--rule);
+       background:var(--field);color:var(--ink);font:inherit;font-size:.9rem}
+  #teamsearch::placeholder{color:var(--kick)}
   #teamsearch:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
   #teamlist{position:absolute;top:110%;left:0;width:280px;background:var(--card);z-index:6;
        border:1px solid var(--border);border-radius:6px;overflow:hidden auto;display:none;
@@ -53,7 +32,8 @@
   #teamlist button:hover,#teamlist button:focus-visible{background:rgba(255,180,58,.12);outline:none}
   #teamlist button[disabled]{color:var(--muted);cursor:default}
   .selchip{display:inline-flex;align-items:center;gap:7px;border-radius:999px;
-       padding:4px 8px 4px 12px;font-size:.82rem;font-weight:700;color:#0e2413}
+       padding:4px 8px 4px 12px;font-size:.82rem;font-weight:700;color:#0e2413;
+       box-shadow:inset 0 0 0 1px rgba(16,24,40,.22)}
   .selchip button{border:0;background:rgba(14,36,19,.25);color:#0e2413;border-radius:50%;
        width:17px;height:17px;line-height:1;font-size:11px;cursor:pointer;font-weight:800}
 
@@ -67,7 +47,7 @@
   .chartbox{position:relative}
   .chartbox svg{width:100%;height:auto;display:block}
   svg text{font:11px system-ui;fill:var(--axis)}
-  .empty{color:var(--muted);text-align:center;padding:50px 16px}
+  .empty{padding:50px 16px}
 
   /* per-team stat cards under the long-run chart */
   .statcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
@@ -76,15 +56,25 @@
   .statcard .t{font-weight:700;font-size:.9rem}
   .statcard .l{color:var(--muted)}
 
-  #tip{position:fixed;z-index:9;pointer-events:none;display:none;background:#050e08;
+  #tip{position:fixed;z-index:9;pointer-events:none;display:none;background:#10221a;
        border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-size:.8rem;
-       color:var(--line);box-shadow:0 4px 16px rgba(0,0,0,.5)}
+       color:var(--line);box-shadow:0 10px 28px rgba(16,24,40,.35)}
   #tip .t{color:var(--tag);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
+
+  .top h1{color:var(--soft)}
+  #teamsearch{background:var(--field);color:var(--ink);border-color:var(--rule)}
+  #teamsearch::placeholder{color:var(--kick)}
+  #teamsearch:focus-visible{outline-color:var(--accent)}
+  #teamlist{background:#fff;border-color:var(--rule);
+       box-shadow:0 8px 24px rgba(16,24,40,.08)}
+  #teamlist button{color:var(--ink)}
+  #teamlist button:hover,#teamlist button:focus-visible{background:#f1f8f4}
+  #teamlist button[disabled]{color:var(--kick)}
 </style>
 </head>
 <body>
 <nav class="top">
-  <a class="home disp" href="index.html">⚽ SoccerHub</a>
+  <a class="home disp" href="index.html">SportSignal</a>
   <h1>Match Center</h1>
 </nav>
 
@@ -122,6 +112,7 @@
 <script>
 const SUPABASE_URL = "https://rgnzemkdldohplwbxxwy.supabase.co";
 const ANON_KEY = "sb_publishable_Qy0bJ4CdrxffuJGNq12ebw_r0-Z3qD-";
+const DEFAULT_TEAMS = ["Chelsea","Arsenal","Tottenham"];
 const LEAGUES = ["ENG-Premier League","ESP-La Liga","GER-Bundesliga",
                  "ITA-Serie A","FRA-Ligue 1"];
 const SEASONS = Array.from({length: 18}, (_,i)=>String(2008+i));
@@ -170,10 +161,15 @@ const hideTip = () => tipEl().style.display="none";
 /* ---------- state via URL ---------- */
 const state = () => {
   const u = new URLSearchParams(location.search);
+  const lg = LEAGUES.includes(u.get("lg")) ? u.get("lg") : LEAGUES[0];
   return {
-    lg: LEAGUES.includes(u.get("lg")) ? u.get("lg") : LEAGUES[0],
+    lg,
     ss: SEASONS.includes(u.get("s")) ? u.get("s") : SEASONS[SEASONS.length-1],
-    teams: (u.get("teams") || "").split(",").filter(Boolean).slice(0, MAX_SEL),
+    // with nothing picked the chart is empty; open on a comparison worth
+    // seeing — but only in the league those clubs actually play in
+    teams: u.has("teams")
+      ? u.get("teams").split(",").filter(Boolean).slice(0, MAX_SEL)
+      : (lg === LEAGUES[0] ? DEFAULT_TEAMS.slice() : []),
   };
 };
 function setState(patch){

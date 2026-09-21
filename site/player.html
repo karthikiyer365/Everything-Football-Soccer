@@ -3,37 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Player Dashboard — SoccerHub</title>
+<title>Player Dashboard — SportSignal</title>
 <meta name="description" content="One page per player: technical profile, value vs output, and career trend, ranked against positional peers.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<link rel="stylesheet" href="theme.css">
 <style>
   /* merged :root — player.html had no --red although player.html:460 used it */
-  :root{
-    --grass:#122b1a; --grass-lt:#16321f; --card:#0a1a0e;
-    --line:#f2f5ef; --muted:#9fb69c; --tag:#8fae8b; --border:rgba(242,245,239,.22);
-    --amber:#ffb43a; --green:#8fd18a; --chalk-y:#e8d47a; --blue:#5aa9f0;
-    --red:#e0524a; --grid:rgba(242,245,239,.10); --axis:rgba(242,245,239,.35);
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0}
-  body{background:
-       repeating-linear-gradient(0deg,var(--grass) 0 72px,var(--grass-lt) 72px 144px);
-       color:var(--line);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
-       min-height:100vh}
   .disp{font-family:"Avenir Next Condensed","Arial Narrow","Helvetica Neue Condensed",Impact,sans-serif;
         text-transform:uppercase;letter-spacing:.04em;font-stretch:condensed}
-  .nums{font-variant-numeric:tabular-nums}
-  a{color:var(--chalk-y)}
 
   /* ---------- nav + search ---------- */
-  .top{position:sticky;top:0;z-index:5;display:flex;gap:16px;align-items:center;
-       padding:12px 20px;background:rgba(5,14,8,.92);backdrop-filter:blur(4px);
-       border-bottom:1px solid var(--border)}
-  .top a.home{color:var(--line);text-decoration:none;font-size:1.05rem;white-space:nowrap}
   .searchwrap{position:relative;flex:1;max-width:440px}
-  #search{width:100%;padding:9px 14px;border-radius:999px;border:1px solid var(--border);
-       background:var(--card);color:var(--line);font:inherit;font-size:.95rem}
-  #search::placeholder{color:var(--tag)}
+  #search{width:100%;padding:9px 14px;border-radius:999px;border:1px solid var(--rule);
+       background:var(--field);color:var(--ink);font:inherit;font-size:.95rem}
+  #search::placeholder{color:var(--kick)}
   #search:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
   #results{position:absolute;top:110%;left:0;right:0;background:var(--card);
        border:1px solid var(--border);border-radius:6px;overflow:hidden auto;display:none;
@@ -45,14 +28,14 @@
   #results .sub{color:var(--tag);font-size:.8rem;white-space:nowrap}
 
   main{max-width:1560px;margin:0 auto;padding:24px 20px 80px}
-  .empty{color:var(--muted);text-align:center;padding:80px 20px;max-width:46ch;margin:0 auto}
-  .empty .disp{color:var(--line);font-size:1.6rem}
+  .empty{padding:80px 20px;max-width:46ch;margin:0 auto}
+  .empty .disp{font-size:1.6rem}
 
   /* ---------- hero strip (flattened .pcard) ---------- */
   .herostrip{border-radius:14px;padding:18px 24px;
-        background:linear-gradient(160deg,#2a4d2f 0%,#17331e 55%,#0e2413 100%);
-        border:1px solid rgba(255,180,58,.55);
-        box-shadow:0 18px 50px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
+        background:linear-gradient(160deg,#17624a 0%,#12543e 55%,#0e4634 100%);
+        border:1px solid rgba(255,180,58,.45);
+        box-shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 24px rgba(16,24,40,.06);
         display:flex;align-items:center;gap:26px;flex-wrap:wrap}
   .rating{text-align:center;min-width:74px}
   .rating b{display:block;font-size:46px;line-height:.9;color:var(--amber)}
@@ -79,14 +62,9 @@
   .warn{color:var(--chalk-y);cursor:help}
 
   /* ---------- season chips ---------- */
-  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 0}
-  .chips button{border:1px solid var(--border);background:var(--card);color:var(--muted);
-       border-radius:999px;padding:4px 12px;font:inherit;font-size:.8rem;cursor:pointer}
-  .chips button[aria-pressed="true"]{background:var(--amber);color:#20160a;
-       border-color:var(--amber);font-weight:700}
-  .chips button:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
 
   /* ---------- tab bar ---------- */
+  .chips{margin:26px 0 0}
   .tabs{display:flex;align-items:stretch;margin:18px 0 0;border-bottom:1px solid var(--border)}
   .tabs button{border:0;background:none;color:var(--muted);font:inherit;font-size:.82rem;
        letter-spacing:.1em;text-transform:uppercase;padding:12px 22px;cursor:pointer;
@@ -105,7 +83,7 @@
   .chartbox{position:relative}
   .chartbox svg{width:100%;height:auto;display:block}
   svg text{font:10px system-ui;fill:var(--axis)}
-  #tip{position:fixed;z-index:9;pointer-events:none;display:none;background:#050e08;
+  #tip{position:fixed;z-index:9;pointer-events:none;display:none;background:#10221a;
        border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-size:.8rem;
        color:var(--line);box-shadow:0 4px 16px rgba(0,0,0,.5);max-width:230px}
   #tip .t{color:var(--tag);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}
@@ -124,7 +102,7 @@
   .cardrow .dots{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
   .cardrow .yc,.cardrow .rc{width:9px;height:12px;border-radius:2px;display:inline-block}
   .cardrow .yc{background:#f5c542}
-  .cardrow .rc{background:#e0524a}
+  .cardrow .rc{background:#f07d73}
   .cardrow .rate{color:var(--muted);margin-left:8px}
   /* the tab holds two scopes; the label says which one you are reading */
   .scopelabel{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--tag);
@@ -231,11 +209,28 @@
   #ask-out th{color:var(--muted);font-weight:600;font-size:.75rem;text-transform:uppercase}
   #ask-out td:first-child,#ask-out th:first-child{padding-left:0}
   #ask-out strong{color:var(--amber);font-weight:600}
+
+  #search{background:var(--field);color:var(--ink);border-color:var(--rule)}
+  #search::placeholder{color:var(--kick)}
+  #search:focus-visible{outline-color:var(--accent)}
+  #results{background:#fff;border-color:var(--rule);
+       box-shadow:0 8px 24px rgba(16,24,40,.08)}
+  #results button{color:var(--ink)}
+  #results button:hover,#results button:focus-visible{background:#f1f8f4}
+  #results .sub{color:var(--kick)}
+  .tabs{border-bottom-color:var(--rule)}
+  .tabs button{color:var(--soft)}
+  .tabs button[aria-selected="true"]{background:var(--accent-deep);color:#fff}
+  .tabs button:focus-visible{outline-color:var(--accent)}
+  .cardnote{color:var(--soft)}
+  .scopelabel{color:var(--kick);border-top-color:var(--rule)}
+  .scopelabel span{color:var(--soft)}
+  .idbox h1{color:#fff}
 </style>
 </head>
 <body>
 <nav class="top">
-  <a class="home disp" href="index.html">⚽ SoccerHub</a>
+  <a class="home disp" href="index.html">SportSignal</a>
   <div class="searchwrap">
     <input id="search" type="search" placeholder="Search any player, 2008–2025…"
            autocomplete="off" aria-label="Search player">
@@ -383,13 +378,21 @@ function pushUrl({s, tab, vs} = {}){
 }
 
 /* ---------- load ---------- */
+// Landing on the dashboard with no player shows an empty search box and
+// nothing else. Open on someone whose career exercises every surface:
+// pre-2014 seasons without xG, a mid-career move, and a full shot map.
+const DEFAULT_TM = "50202";   // Eden Hazard
+
 window.addEventListener("popstate", load);
 load();
 
 async function load(){
   const u = qs();
   const main = document.getElementById("main");
-  if(!u.has("tm") && !u.has("name")) return;
+  if(!u.has("tm") && !u.has("name")){
+    history.replaceState({}, "", `?tm=${DEFAULT_TM}`);
+    return load();
+  }
   main.innerHTML = `<div class="empty">Loading…</div>`;
 
   const params = {select: "*", order: "season"};
@@ -648,7 +651,7 @@ function gameLine(c, allShots){
 function render(){
   const c = careerModel();
   const last = c.last;
-  document.title = `${last.player_name} — SoccerHub`;
+  document.title = `${last.player_name} — SportSignal`;
 
   const s = sel(), best = bestSeason();
   const chip = (val, label, pressed) =>
@@ -1697,8 +1700,18 @@ async function drawRadars(season){
 
 }
 
-const HEX = {"var(--amber)":"#ffb43a", "var(--blue)":"#5aa9f0", "var(--green)":"#8fd18a",
-             "var(--chalk-y)":"#e8d47a", "var(--red)":"#e0524a"};
+// Resolve var(--x) against the live stylesheet instead of keeping a second
+// copy of the palette here. A hardcoded map silently drifts from theme.css
+// every time a colour changes — which it did, twice.
+const cssVar = (() => {
+  const root = getComputedStyle(document.documentElement);
+  const cache = {};
+  return c => {
+    const m = /^var\((--[\w-]+)\)$/.exec(c);
+    if(!m) return c;
+    return cache[m[1]] ??= root.getPropertyValue(m[1]).trim() || c;
+  };
+})();
 
 // Radar. Solo: one group-coloured polygon over a grey peer-median backdrop.
 // Compare: each player a single-colour line polygon, no median (the overlay is
@@ -1711,7 +1724,7 @@ function profileRadar(players, compare){
   const rad = p => R0 + (R1-R0)*(p ?? 0)/100;
   const at  = (i,p) => [cx + rad(p)*Math.cos(ang(i)), cy + rad(p)*Math.sin(ang(i))];
   const ptAbs = (r,a) => `${(cx+r*Math.cos(a)).toFixed(1)} ${(cy+r*Math.sin(a)).toFixed(1)}`;
-  const hex = c => HEX[c] ?? c;
+  const hex = cssVar;
   const slices = players[0].slices;   // axis definitions shared across players
 
   let g = "";
