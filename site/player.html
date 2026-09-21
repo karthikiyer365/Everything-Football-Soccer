@@ -407,10 +407,9 @@ async function load(){
     main.innerHTML = `<div class="empty">No seasons found for this player.</div>`;
     return;
   }
-  // safe here and not at the top of load(): these live in the tab modules
-  // further down the file, so they only exist once the script has evaluated.
-  resetTechnicalCaches();
-  resetValueCaches();
+  // safe here and not at the top of load(): this lives in the tab modules
+  // further down the file, so it only exists once the script has evaluated.
+  resetCaches();
 
   seasons = [...new Set(rows.map(r => r.season))].sort();
   // Technical needs BOTH an Understat-era season and a matched Understat id.
@@ -797,33 +796,39 @@ async function renderTechnical(body){
    charts and logs below are the whole career. Both fetch on first open.
    ==================================================================== */
 
-let moves = [], movesPromise = null, curve = [], curvePromise = null;
+let moves = [], curve = [];
 
-function resetValueCaches(){
-  moves = []; movesPromise = null; curve = []; curvePromise = null;
+// A tab's data is fetched once per player: the first call starts it, later
+// calls get the same promise, and .reset() drops it when the player changes.
+const once = fn => { const f = () => f._p ??= fn(); f.reset = () => f._p = null; return f; };
+
+// every per-player cache, cleared together when load() picks up a new player
+function resetCaches(){
+  moves = []; curve = []; shots = [];
   peers = []; peersKey = null;
+  loadMoves.reset(); loadCurve.reset(); loadShots.reset();
+  selectedBands.clear();
+  peerCache.clear(); careerCache.clear();
 }
 
-function loadMoves(){
-  if(movesPromise) return movesPromise;
+const loadMoves = once(async () => {
   const tm = mainTm();
-  if(!tm) return movesPromise = Promise.resolve(moves = []);
-  return movesPromise = hub("transfers",
+  if(!tm) return moves = [];
+  // coverage is patchy upstream; the chart's dotted lines say so
+  try{ return moves = await hub("transfers",
     {select:"transfer_date,from_club_name,to_club_name,transfer_fee,market_value_in_eur",
-     tm_id:`eq.${tm}`, order:"transfer_date"})
-    .then(r => moves = r)
-    .catch(() => moves = []);   // coverage is patchy upstream; the chart says so
-}
+     tm_id:`eq.${tm}`, order:"transfer_date"}); }
+  catch{ return moves = []; }
+});
 
-function loadCurve(){
-  if(curvePromise) return curvePromise;
+const loadCurve = once(async () => {
   const pos = rows[rows.length-1]?.primary_position;
-  if(!pos) return curvePromise = Promise.resolve(curve = []);
-  return curvePromise = hub("age_curve",
-    {select:"age,avg_value_eur", primary_position:`eq.${pos}`, order:"age"})
-    .then(r => curve = r)
-    .catch(() => curve = []);   // losing the curve must not cost the other lines
-}
+  if(!pos) return curve = [];
+  // losing the curve must not cost the other line its chart
+  try{ return curve = await hub("age_curve",
+    {select:"age,avg_value_eur", primary_position:`eq.${pos}`, order:"age"}); }
+  catch{ return curve = []; }
+});
 
 async function renderValue(body){
   body.innerHTML = `<div class="box"><p class="cap">Ranking…</p></div>`;
@@ -832,8 +837,7 @@ async function renderValue(body){
   const srow = seasonRow();
   const m = cardModel(srow, peers);
   const typical = Object.fromEntries(curve.map(c => [c.age, c.avg_value_eur]));
-  const pinned = sel() === "career";
-  const peakVal = rows.reduce((a,r) => Math.max(a, r.market_value_in_eur||0), 0);
+  const peakVal = careerModel().peakVal;
 
   const bar = (label, p, color, raw) => `
     <div class="bar"><label>${label}</label>
@@ -862,7 +866,7 @@ async function renderValue(body){
   <p class="scopelabel">${esc(srow.season)} season
     <span>· ranked against ${m.pool.length} ${esc(srow.primary_position ?? "")} in the
     ${esc(srow.league.split("-")[1] ?? srow.league)}, ≥${MIN_MINUTES} min${
-      pinned ? ` — pinned here because "Career" has no single-season peer pool` : ""}</span></p>
+      sel() === "career" ? ` — pinned here because "Career" has no single-season peer pool` : ""}</span></p>
 
   <div class="valueduo">
     <div class="box">
@@ -888,7 +892,7 @@ async function renderValue(body){
       ${bar("Value €", m.pct.market_value_in_eur, "var(--amber)", eur(srow.market_value_in_eur))}
       ${m.verdict.note ? `<p class="cap">${m.verdict.note}</p>` : ""}
       ${m.verdict.ceiling ? `<p class="cap">${m.verdict.ceiling}</p>` : ""}
-      <p class="cap">Peak career value ${eur(peakVal||null)}.</p>
+      <p class="cap">Peak career value ${eur(peakVal)}.</p>
     </div>
 
     <div class="box">
@@ -1188,14 +1192,25 @@ function xAxis(rs,H,PB){
 }
 
 /* ---------- hover layer for the value tab's four charts ---------- */
-function wireValueTooltips(m, typical = {}){
-  const idxFromEvent = (svg,e) => {
-    const r = svg.getBoundingClientRect();
-    const x = (e.clientX-r.left)/r.width*W;
-    return Math.max(0, Math.min(rows.length-1,
+// The three career charts share an x band scale, so they share a crosshair
+// and the season lookup behind it; only the tooltip body differs.
+function bandHover(svgId, crossId, body){
+  const svg = document.getElementById(svgId), cross = document.getElementById(crossId);
+  if(!svg) return;
+  svg.addEventListener("mousemove", e => {
+    const box = svg.getBoundingClientRect();
+    const x = (e.clientX-box.left)/box.width*W;
+    const i = Math.max(0, Math.min(rows.length-1,
       Math.floor((x-PAD_L)/(W-PAD_L-PAD_R)*rows.length)));
-  };
+    cross.setAttribute("x1",bandX(rows,i)); cross.setAttribute("x2",bandX(rows,i));
+    cross.setAttribute("visibility","visible");
+    showTip(e, body(rows[i]));
+  });
+  svg.addEventListener("mouseleave", () => { hideTip(); cross.setAttribute("visibility","hidden"); });
+}
 
+function wireValueTooltips(m, typical = {}){
+  // the scatter is the odd one out: dots, not bands
   const s = document.getElementById("schart");
   if(s){
     s.addEventListener("mousemove", e => {
@@ -1209,54 +1224,31 @@ function wireValueTooltips(m, typical = {}){
     s.addEventListener("mouseleave", hideTip);
   }
 
-  const v = document.getElementById("vchart"), vcross = document.getElementById("vcross");
-  if(v){
-    v.addEventListener("mousemove", e => {
-      const i = idxFromEvent(v,e), r = rows[i];
-      vcross.setAttribute("x1",bandX(rows,i)); vcross.setAttribute("x2",bandX(rows,i));
-      vcross.setAttribute("visibility","visible");
-      const tv = r.age!=null ? typical[r.age] : null;
-      const gap = tv!=null && r.market_value_in_eur!=null ? r.market_value_in_eur - tv : null;
-      showTip(e, `<div class="t">${esc(r.season)} · ${esc(r.team)}${r.age!=null?" · age "+r.age:""}</div>
-        ${eur(r.market_value_in_eur)}${r.value_is_stale?" ⚠":""}<br>
-        typical ${eur(tv)}${gap!=null
-          ? ` · <span style="color:${gap>0?"var(--amber)":"var(--green)"}">${gap>0?"+":"−"}${eur(Math.abs(gap))}</span>`
-          : ""}`);
-    });
-    v.addEventListener("mouseleave", () => { hideTip(); vcross.setAttribute("visibility","hidden"); });
-  }
+  bandHover("vchart", "vcross", r => {
+    const tv = r.age!=null ? typical[r.age] : null;
+    const gap = tv!=null && r.market_value_in_eur!=null ? r.market_value_in_eur - tv : null;
+    return `<div class="t">${esc(r.season)} · ${esc(r.team)}${r.age!=null?" · age "+r.age:""}</div>
+      ${eur(r.market_value_in_eur)}${r.value_is_stale?" ⚠":""}<br>
+      typical ${eur(tv)}${gap!=null
+        ? ` · <span style="color:${gap>0?"var(--amber)":"var(--green)"}">${gap>0?"+":"−"}${eur(Math.abs(gap))}</span>`
+        : ""}`;
+  });
 
-  const xc = document.getElementById("xchart");
-  if(xc){
-    const xcross = document.getElementById("xcross");
-    xc.addEventListener("mousemove", e => {
-      const i = idxFromEvent(xc,e), r = rows[i];
-      xcross.setAttribute("x1",bandX(rows,i)); xcross.setAttribute("x2",bandX(rows,i));
-      xcross.setAttribute("visibility","visible");
-      const d = r.np_xg!=null ? (r.non_penalty_goals ?? 0) - r.np_xg : null;
-      showTip(e, `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
-        ${r.np_xg!=null
-          ? `${r.non_penalty_goals ?? 0} npG vs ${r.np_xg.toFixed(1)} npxG<br>
-             ${d>0?"+":""}${d.toFixed(1)} ${d>0?"over":"under"}performance`
-          : "no xG data this season"}`);
-    });
-    xc.addEventListener("mouseleave", () => {
-      hideTip(); xcross.setAttribute("visibility","hidden"); });
-  }
+  bandHover("xchart", "xcross", r => {
+    const d = r.np_xg!=null ? (r.non_penalty_goals ?? 0) - r.np_xg : null;
+    return `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
+      ${r.np_xg!=null
+        ? `${r.non_penalty_goals ?? 0} npG vs ${r.np_xg.toFixed(1)} npxG<br>
+           ${d>0?"+":""}${d.toFixed(1)} ${d>0?"over":"under"}performance`
+        : "no xG data this season"}`;
+  });
 
-  const t = document.getElementById("tchart"), tc = document.getElementById("tcross");
-  if(t){
-    t.addEventListener("mousemove", e => {
-      const i = idxFromEvent(t,e), r = rows[i];
-      tc.setAttribute("x1",bandX(rows,i)); tc.setAttribute("x2",bandX(rows,i));
-      tc.setAttribute("visibility","visible");
-      // a Bundesliga season is 34 games, so the share is against that player's own league
-      const full = (r.league?.startsWith("GER") ? 34 : 38) * 90;
-      showTip(e, `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
-        ${(r.minutes ?? 0).toLocaleString("en")} min · ${Math.round(100*(r.minutes||0)/full)}% of the season`);
-    });
-    t.addEventListener("mouseleave", () => { hideTip(); tc.setAttribute("visibility","hidden"); });
-  }
+  bandHover("tchart", "tcross", r => {
+    // a Bundesliga season is 34 games, so the share is against the player's own league
+    const full = (r.league?.startsWith("GER") ? 34 : 38) * 90;
+    return `<div class="t">${esc(r.season)} · ${esc(r.team)}</div>
+      ${(r.minutes ?? 0).toLocaleString("en")} min · ${Math.round(100*(r.minutes||0)/full)}% of the season`;
+  });
 }
 
 /* ====================================================================
@@ -1326,8 +1318,7 @@ function renderAsk(body){
 // (## headers, **bold**, - bullets, pipe tables). Keep in sync with
 // Soccer Data Hub/src/soccerhub/agent.py _SYSTEM_INSTRUCTION.
 function renderAskMd(md){
-  const esc2 = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  const bold = s => esc2(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  const bold = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   const lines = md.split("\n");
   let html = "", i = 0;
   while(i < lines.length){
@@ -1373,27 +1364,18 @@ function renderAskMd(md){
 const techRows  = () => rows.filter(r => +r.season >= XG_SINCE);
 const techSrow  = () => techRows()[techRows().length-1] ?? rows[rows.length-1];
 
-let shots = [], shotsPromise = null;
+let shots = [];
 const peerCache = new Map(), careerCache = new Map();
 
-function resetTechnicalCaches(){
-  shots = []; shotsPromise = null;
-  selectedBands.clear();
-  peerCache.clear(); careerCache.clear();
-}
-
 // one fetch per player: every shot, then filtered per season in the view
-function loadShots(){
-  if(shotsPromise) return shotsPromise;
+const loadShots = once(async () => {
   const uid = [...rows].reverse().find(r => r.understat_id != null)?.understat_id;
-  if(uid == null) return shotsPromise = Promise.resolve(shots = []);
-  shotsPromise = hubAll("shots_understat",
+  if(uid == null) return shots = [];
+  try{ return shots = await hubAll("shots_understat",
     {select:"season,date,team,xg,location_x,location_y,body_part,situation,result,minute",
-     player_id:`eq.${uid}`, order:"date"})
-    .then(r => shots = r)
-    .catch(() => shots = []);      // map degrades to a stated gap
-  return shotsPromise;
-}
+     player_id:`eq.${uid}`, order:"date"}); }
+  catch{ return shots = []; }      // map degrades to a stated gap
+});
 
 /* ---------- radar metric definitions ----------
    Each axis: want -> proxy -> grade. Rates are per 90, computed from summed
