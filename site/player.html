@@ -337,7 +337,12 @@ async function runSearch(q){
    URL is the single source of truth: ?tm= | ?name= identify the player,
    ?s= the season ("career" or a season label), ?tab= the open lens,
    ?vs= the radar's comparison players.                                   */
-const TABS = ["technical", "value", "ask"];
+// The agent behind the Ask tab is not dependable yet, so the tab is hidden
+// rather than removed: flip this to true and it returns, code and all.
+// With "ask" out of TABS, ?tab=ask falls back instead of opening a surface
+// that does not work.
+const ASK_ENABLED = false;
+const TABS = ["technical", "value", ...(ASK_ENABLED ? ["ask"] : [])];
 let rows = [], seasons = [], peers = [];
 let hasTechnical = false, defaultTab = "value";
 
@@ -696,7 +701,7 @@ function render(){
   <div class="tabs" role="tablist">
     ${tabBtn("technical", "Technical")}
     ${tabBtn("value", "Value")}
-    ${tabBtn("ask", "Ask")}
+    ${ASK_ENABLED ? tabBtn("ask", "Ask") : ""}
   </div>
   <div id="tabbody" role="tabpanel"></div>`;
 
