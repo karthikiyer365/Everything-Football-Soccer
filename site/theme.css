@@ -1,0 +1,73 @@
+/* SportSignal — one palette for every page.
+ *
+ * Two grounds, deliberately:
+ *   shell   light  — the page itself: nav, chips, tabs, search, body copy
+ *   panel   dark   — every data surface: charts, hero strip, tooltips, logs
+ *
+ * The panels are not "not yet converted". A half-opaque green has no working
+ * series palette (dark-ground colours never clear 1.5:1 on one, light-ground
+ * colours fall under 3:1), so the choice was a pale tint or a solid dark card.
+ * Solid won, because the SVG code was written for a dark ground.
+ *
+ * Series values below are measured against --card, not picked by eye:
+ *   green 5.7:1 · amber 5.8:1 · chalk 6.9:1 · blue 4.1:1 · red 3.8:1
+ * Changing --card means re-checking all five.
+ */
+
+:root{
+  /* ---------- shell: light ---------- */
+  --bg:#ffffff; --panel:#ffffff; --band:#f7f9fa; --field:#f4f6f8;
+  --ink:#0f1720; --soft:#5b6875; --kick:#7b8894; --rule:#e7ebee;
+  --accent:#0e9f6e; --accent-deep:#0b7c56; --on-accent:#ffffff;
+  --live:#0b7c56; --live-bg:#e3f6ee; --soon-bg:#eef1f4;
+  --shadow-sm:0 1px 2px rgba(16,24,40,.04);
+  --shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 24px rgba(16,24,40,.05);
+  --disp:"Inter","Helvetica Neue",system-ui,-apple-system,sans-serif;
+
+  /* ---------- panels: dark ---------- */
+  --card:#0f4a36;
+  --line:#f2f5ef; --muted:#c6d6ce; --tag:#86b39b;
+  --border:rgba(242,245,239,.20);
+  --grid:rgba(242,245,239,.12); --axis:rgba(242,245,239,.40);
+  --grass:#122b1a;              /* inset fields sitting inside a panel */
+
+  /* ---------- series, tuned for --card ---------- */
+  --green:#8fd18a; --amber:#ffb43a; --chalk-y:#e8d47a;
+  --blue:#5aa9f0;  --red:#f07d73;
+  --amber-fill:#f7b500;         /* the landing hero's travelling dot */
+}
+
+/* ---------- base ---------- */
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);
+     font:16px/1.55 var(--disp);-webkit-font-smoothing:antialiased}
+a{color:var(--accent-deep)}
+.nums{font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+/* ---------- dashboard chrome ----------
+   These selectors exist only on player.html and match.html; they match
+   nothing on the landing page, which has its own nav. */
+.top{position:sticky;top:0;z-index:5;display:flex;gap:16px;align-items:center;
+     padding:12px 20px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
+     border-bottom:1px solid var(--rule)}
+.top a.home{color:var(--ink);text-decoration:none;font-size:1.05rem;white-space:nowrap;
+     font-family:var(--disp);font-weight:750;letter-spacing:-.02em;text-transform:none;
+     font-stretch:normal;display:inline-flex;align-items:center;gap:9px}
+.top a.home::before{content:"";width:13px;height:13px;border-radius:50%;
+     background:var(--accent);display:inline-block}
+
+.empty{color:var(--soft);text-align:center}
+.empty .disp{color:var(--ink)}
+
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{border:1px solid var(--rule);background:#fff;color:var(--soft);
+     border-radius:999px;padding:4px 12px;font:inherit;font-size:.8rem;cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--accent-deep);
+     border-color:var(--accent-deep);color:#fff;font-weight:700}
+
+/* A panel declares its own text colour. body{color} is the shell's dark ink for
+   the white page, and anything unstyled inside a dark panel would inherit it —
+   that is how the player name, log cells and percentile numbers vanish. */
+.box,.herostrip,details.season-log,#tip{color:var(--line)}

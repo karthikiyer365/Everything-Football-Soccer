@@ -6,34 +6,17 @@
 <title>Player Dashboard — SportSignal</title>
 <meta name="description" content="One page per player: technical profile, value vs output, and career trend, ranked against positional peers.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<link rel="stylesheet" href="theme.css">
 <style>
   /* merged :root — player.html had no --red although player.html:460 used it */
-  :root{
-    --grass:#122b1a; --grass-lt:#16321f; --card:#0f4a36;
-    --line:#f2f5ef; --muted:#c6d6ce; --tag:#86b39b; --border:rgba(242,245,239,.20);
-    --amber:#ffb43a; --green:#8fd18a; --chalk-y:#e8d47a; --blue:#5aa9f0;
-    --red:#f07d73; --grid:rgba(242,245,239,.12); --axis:rgba(242,245,239,.40);
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0}
-  body{background:
-       repeating-linear-gradient(0deg,var(--grass) 0 72px,var(--grass-lt) 72px 144px);
-       color:var(--line);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
-       min-height:100vh}
   .disp{font-family:"Avenir Next Condensed","Arial Narrow","Helvetica Neue Condensed",Impact,sans-serif;
         text-transform:uppercase;letter-spacing:.04em;font-stretch:condensed}
-  .nums{font-variant-numeric:tabular-nums}
-  a{color:var(--chalk-y)}
 
   /* ---------- nav + search ---------- */
-  .top{position:sticky;top:0;z-index:5;display:flex;gap:16px;align-items:center;
-       padding:12px 20px;background:rgba(5,14,8,.92);backdrop-filter:blur(4px);
-       border-bottom:1px solid var(--border)}
-  .top a.home{color:var(--line);text-decoration:none;font-size:1.05rem;white-space:nowrap}
   .searchwrap{position:relative;flex:1;max-width:440px}
-  #search{width:100%;padding:9px 14px;border-radius:999px;border:1px solid var(--border);
-       background:var(--card);color:var(--line);font:inherit;font-size:.95rem}
-  #search::placeholder{color:var(--tag)}
+  #search{width:100%;padding:9px 14px;border-radius:999px;border:1px solid var(--rule);
+       background:var(--field);color:var(--ink);font:inherit;font-size:.95rem}
+  #search::placeholder{color:var(--kick)}
   #search:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
   #results{position:absolute;top:110%;left:0;right:0;background:var(--card);
        border:1px solid var(--border);border-radius:6px;overflow:hidden auto;display:none;
@@ -45,8 +28,8 @@
   #results .sub{color:var(--tag);font-size:.8rem;white-space:nowrap}
 
   main{max-width:1560px;margin:0 auto;padding:24px 20px 80px}
-  .empty{color:var(--muted);text-align:center;padding:80px 20px;max-width:46ch;margin:0 auto}
-  .empty .disp{color:var(--line);font-size:1.6rem}
+  .empty{padding:80px 20px;max-width:46ch;margin:0 auto}
+  .empty .disp{font-size:1.6rem}
 
   /* ---------- hero strip (flattened .pcard) ---------- */
   .herostrip{border-radius:14px;padding:18px 24px;
@@ -79,12 +62,6 @@
   .warn{color:var(--chalk-y);cursor:help}
 
   /* ---------- season chips ---------- */
-  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 0}
-  .chips button{border:1px solid var(--border);background:var(--card);color:var(--muted);
-       border-radius:999px;padding:4px 12px;font:inherit;font-size:.8rem;cursor:pointer}
-  .chips button[aria-pressed="true"]{background:var(--amber);color:#20160a;
-       border-color:var(--amber);font-weight:700}
-  .chips button:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
 
   /* ---------- tab bar ---------- */
   .tabs{display:flex;align-items:stretch;margin:18px 0 0;border-bottom:1px solid var(--border)}
@@ -232,52 +209,20 @@
   #ask-out td:first-child,#ask-out th:first-child{padding-left:0}
   #ask-out strong{color:var(--amber);font-weight:600}
 
-  /* ================= light shell — matches index.html =================
-     Page chrome only: background, nav, search, chips, tabs and the text
-     that sits directly on the page. The analysis panels keep the dark
-     palette until their charts are tokenised, so dark cards sit on a
-     white page by design, not by omission. */
-  :root{
-    --shell-bg:#ffffff; --shell-ink:#0f1720; --shell-soft:#5b6875;
-    --shell-kick:#7b8894; --shell-rule:#e7ebee; --shell-field:#f4f6f8;
-    --shell-accent:#0e9f6e; --shell-accent-deep:#0b7c56;
-  }
-  body{background:var(--shell-bg);color:var(--shell-ink);
-       font-family:"Inter","Helvetica Neue",system-ui,-apple-system,sans-serif}
-  a{color:var(--shell-accent-deep)}
-  .top{background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
-       border-bottom:1px solid var(--shell-rule)}
-  /* the wordmark picks up index.html's green dot */
-  .top a.home{color:var(--shell-ink);font-family:inherit;font-weight:750;
-       letter-spacing:-.02em;text-transform:none;font-stretch:normal;
-       display:inline-flex;align-items:center;gap:9px}
-  .top a.home::before{content:"";width:13px;height:13px;border-radius:50%;
-       background:var(--shell-accent);display:inline-block}
-  .empty{color:var(--shell-soft)}
-  .empty .disp{color:var(--shell-ink)}
-  .chips button{background:#fff;border-color:var(--shell-rule);color:var(--shell-soft)}
-  .chips button[aria-pressed="true"]{background:var(--shell-accent-deep);
-       border-color:var(--shell-accent-deep);color:#fff;font-weight:700}
-  .chips button:focus-visible{outline-color:var(--shell-accent)}
-  #search{background:var(--shell-field);color:var(--shell-ink);border-color:var(--shell-rule)}
-  #search::placeholder{color:var(--shell-kick)}
-  #search:focus-visible{outline-color:var(--shell-accent)}
-  #results{background:#fff;border-color:var(--shell-rule);
-       box-shadow:0 8px 24px rgba(16,24,40,.08)}
-  #results button{color:var(--shell-ink)}
+  #search{background:var(--field);color:var(--ink);border-color:var(--rule)}
+  #search::placeholder{color:var(--kick)}
+  #search:focus-visible{outline-color:var(--accent)}
+  #results{background:#fff;border-color:var(--rule);
+  #results button{color:var(--ink)}
   #results button:hover,#results button:focus-visible{background:#f1f8f4}
-  #results .sub{color:var(--shell-kick)}
-  .tabs{border-bottom-color:var(--shell-rule)}
-  .tabs button{color:var(--shell-soft)}
-  .tabs button[aria-selected="true"]{background:var(--shell-accent-deep);color:#fff}
-  .tabs button:focus-visible{outline-color:var(--shell-accent)}
-  .cardnote{color:var(--shell-soft)}
-  /* section labels in the Value tab sit on the page, not in a card */
-  .scopelabel{color:var(--shell-kick);border-top-color:var(--shell-rule)}
-  .scopelabel span{color:var(--shell-soft)}
-  /* panels set their own text colour: body{color} is the light shell's ink,
-     and anything unstyled inside a dark panel would inherit it */
-  .herostrip,.box,details.season-log,#tip{color:var(--line)}
+  #results .sub{color:var(--kick)}
+  .tabs{border-bottom-color:var(--rule)}
+  .tabs button{color:var(--soft)}
+  .tabs button[aria-selected="true"]{background:var(--accent-deep);color:#fff}
+  .tabs button:focus-visible{outline-color:var(--accent)}
+  .cardnote{color:var(--soft)}
+  .scopelabel{color:var(--kick);border-top-color:var(--rule)}
+  .scopelabel span{color:var(--soft)}
   .idbox h1{color:#fff}
 </style>
 </head>
@@ -1745,9 +1690,18 @@ async function drawRadars(season){
 
 }
 
-// mirrors :root — SVG fills are built in strings, so they cannot use var()
-const HEX = {"var(--amber)":"#ffb43a", "var(--blue)":"#5aa9f0", "var(--green)":"#8fd18a",
-             "var(--chalk-y)":"#e8d47a", "var(--red)":"#f07d73"};
+// Resolve var(--x) against the live stylesheet instead of keeping a second
+// copy of the palette here. A hardcoded map silently drifts from theme.css
+// every time a colour changes — which it did, twice.
+const cssVar = (() => {
+  const root = getComputedStyle(document.documentElement);
+  const cache = {};
+  return c => {
+    const m = /^var\((--[\w-]+)\)$/.exec(c);
+    if(!m) return c;
+    return cache[m[1]] ??= root.getPropertyValue(m[1]).trim() || c;
+  };
+})();
 
 // Radar. Solo: one group-coloured polygon over a grey peer-median backdrop.
 // Compare: each player a single-colour line polygon, no median (the overlay is
@@ -1760,7 +1714,7 @@ function profileRadar(players, compare){
   const rad = p => R0 + (R1-R0)*(p ?? 0)/100;
   const at  = (i,p) => [cx + rad(p)*Math.cos(ang(i)), cy + rad(p)*Math.sin(ang(i))];
   const ptAbs = (r,a) => `${(cx+r*Math.cos(a)).toFixed(1)} ${(cy+r*Math.sin(a)).toFixed(1)}`;
-  const hex = c => HEX[c] ?? c;
+  const hex = cssVar;
   const slices = players[0].slices;   // axis definitions shared across players
 
   let g = "";
