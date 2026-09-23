@@ -13,7 +13,7 @@ FBref · Transfermarkt · StatsBomb
   Supabase Postgres  ←  source of truth (RLS: anon read-only)
         │
         v
-  site/ dashboards (GitHub Pages)
+  site/ dashboards (Netlify)
 ```
 
 ## Projects
@@ -25,9 +25,11 @@ entity-resolved across FBref and Transfermarkt into Supabase.
 See [`Soccer Data Hub/README.md`](Soccer%20Data%20Hub/README.md).
 
 ### 2. Site (`site/`)
-Static dashboards on GitHub Pages reading Supabase directly (anon key, select-only).
+Static dashboards on Netlify reading Supabase directly (anon key, select-only).
 Live: pitch-themed landing + player dashboard (career values, G+A, transfers).
-Deployed by `.github/workflows/deploy-pages.yml` on push to main.
+Live at <https://fivethreetwo.netlify.app>.
+Deployed by Netlify on push to main (`netlify.toml`, publish dir `site/`).
+`netlify.toml` also rewrites `/api/ask` to the Render agent — same-origin, no CORS.
 
 ### 3. Player Performance Analysis (legacy, frozen)
 FIFA player-scouting toolkit, 2015–2022 datasets: ETL, Dash dashboard, statistical
