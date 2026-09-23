@@ -35,7 +35,7 @@ don't patch prose.
 - What: pitch-themed hub; formation grid of 9 dashboard cards — 2 live (Player,
   Match Center), 7 `▓ planned ▓` ("In training" / "Next window" in the UI).
 - Where: `site/index.html` (static — no JS beyond SMIL ball animation).
-- Docs: none dedicated; deployed by `.github/workflows/deploy-pages.yml`.
+- Docs: none dedicated; deployed by Netlify (`netlify.toml`).
 - Edges: ⟶ A1, ⟶ A7.
 - Note: footer's "refreshed twice weekly" holds — cron covers all tables (C2/C3/C6/C7).
 
@@ -238,13 +238,13 @@ don't patch prose.
 ---
 
 **[B8] CI / automation**
-- What: two workflows. `run-season.yml`: cron Mon+Thu 06:00 UTC, five jobs —
+- What: one workflow. `run-season.yml`: cron Mon+Thu 06:00 UTC, five jobs —
   `seasons` (5-league matrix, `max-parallel: 1` for FBref IP-block protection),
   `transfers`, `matches` (5-league matrix, full parallel — plain CSV, no scrape
   risk), `club-elo` (daily snapshot), `age-curve` (needs: seasons — derived from
-  the hub). `workflow_dispatch` takes a season override. `deploy-pages.yml`:
-  push to main touching `site/**` → GitHub Pages.
-- Where: `.github/workflows/run-season.yml`, `.github/workflows/deploy-pages.yml`.
+  the hub). `workflow_dispatch` takes a season override. Site deploy is not a
+  workflow — Netlify builds from `netlify.toml` on push to main.
+- Where: `.github/workflows/run-season.yml`, `netlify.toml`.
 - Note: `SEASON` default is hardcoded "2025" — bump each August. The five-job
   pipeline has not yet had a green scheduled run — verify after next merge.
 
@@ -373,10 +373,11 @@ one-off backfill (done):
 **C4 · Landing/site deploy**
 
 ```
-git push main (paths site/**) ──> deploy-pages.yml ──> configure-pages
-  └──> upload-pages-artifact(site/) ──> deploy-pages ──> github.io
+git push main ──> Netlify build hook ──> publish site/ ──> *.netlify.app
+  └──> /api/ask rewrite ──> soccerhub-agent.onrender.com/ask  (see C5)
 ```
-One-time repo setting required (Pages source = GitHub Actions) — done 2026-07-16.
+Netlify chosen over GitHub Pages: Pages is static-only and cannot rewrite
+`/api/ask`, so the agent call would break CORS. Pages deploy removed 2026-09-21.
 
 ---
 
